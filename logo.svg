@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="screenGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d2d3d"/>
+      <stop offset="100%" style="stop-color:#1a1a28"/>
+    </linearGradient>
+    <linearGradient id="pixelGreen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4ade80"/>
+      <stop offset="100%" style="stop-color:#22c55e"/>
+    </linearGradient>
+    <linearGradient id="pixelPink" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f472b6"/>
+      <stop offset="100%" style="stop-color:#ec4899"/>
+    </linearGradient>
+    <linearGradient id="pixelBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="pixelYellow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24"/>
+      <stop offset="100%" style="stop-color:#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="pixelOrange" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fb923c"/>
+      <stop offset="100%" style="stop-color:#f97316"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="screenGlowFilter">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="248" fill="#0f0f1a" stroke="#333" stroke-width="2"/>
+
+  <!-- Device body (rounded rectangle) -->
+  <rect x="96" y="72" width="320" height="368" rx="24" ry="24" fill="url(#bodyGrad)" stroke="#444" stroke-width="2"/>
+
+  <!-- Screen bezel -->
+  <rect x="120" y="96" width="272" height="220" rx="8" ry="8" fill="#111118" stroke="#555" stroke-width="1.5"/>
+
+  <!-- Screen -->
+  <rect x="132" y="108" width="248" height="196" rx="4" ry="4" fill="url(#screenGlow)"/>
+
+  <!-- Pixel grid on screen - Pimoroni "P" shape made of colorful pixels -->
+  <!-- Each pixel is 20x20 with 2px gap -->
+
+  <!-- Row 1 -->
+  <rect x="152" y="124" width="18" height="18" rx="2" fill="url(#pixelPink)" filter="url(#glow)" opacity="0.95"/>
+  <rect x="174" y="124" width="18" height="18" rx="2" fill="url(#pixelPink)" filter="url(#glow)" opacity="0.95"/>
+  <rect x="196" y="124" width="18" height="18" rx="2" fill="url(#pixelOrange)" filter="url(#glow)" opacity="0.95"/>
+  <rect x="218" y="124" width="18" height="18" rx="2" fill="url(#pixelYellow)" filter="url(#glow)" opacity="0.95"/>
+  <rect x="240" y="124" width="18" height="18" rx="2" fill="url(#pixelYellow)" filter="url(#glow)" opacity="0.95"/>
+
+  <!-- Row 2 -->
+  <rect x="152" y="146" width="18" height="18" rx="2" fill="url(#pixelPink)" filter="url(#glow)" opacity="0.95"/>
+  <rect x="262" y="146" width="18" height="18" rx="2" fill="url(#pixelGreen)" filter="url(#glow)" opacity="0.95"/>
+
+  <!-- Row 3 -->
+  <rect x="152" y="168" width="18" height="18" rx="2" fill="url(#pixelOrange)" filter="url(#glow)" opacity="0.95"/>
+  <rect x="174" y="168" width="18" height="18" rx="2" fill="url(#pixelOrange)" filter="url(#glow)" opacity="0.95"/>
+  <rect x="196" y="168" width="18" height="18" rx="2" fill="url(#pixelYellow)" filter="url(#glow)" opacity="0.95"/>
+  <rect x="218" y="168" width="18" height="18" rx="2" fill="url(#pixelGreen)" filter="url(#glow)" opacity="0.95"/>
+  <rect x="240" y="168" width="18" height="18" rx="2" fill="url(#pixelGreen)" filter="url(#glow)" opacity="0.95"/>
+
+  <!-- Row 4 -->
+  <rect x="152" y="190" width="18" height="18" rx="2" fill="url(#pixelOrange)" filter="url(#glow)" opacity="0.95"/>
+
+  <!-- Row 5 -->
+  <rect x="152" y="212" width="18" height="18" rx="2" fill="url(#pixelYellow)" filter="url(#glow)" opacity="0.95"/>
+
+  <!-- Row 6 -->
+  <rect x="152" y="234" width="18" height="18" rx="2" fill="url(#pixelGreen)" filter="url(#glow)" opacity="0.95"/>
+
+  <!-- Scattered ambient pixels -->
+  <rect x="296" y="136" width="12" height="12" rx="2" fill="url(#pixelBlue)" filter="url(#glow)" opacity="0.4"/>
+  <rect x="318" y="168" width="12" height="12" rx="2" fill="url(#pixelGreen)" filter="url(#glow)" opacity="0.3"/>
+  <rect x="306" y="224" width="12" height="12" rx="2" fill="url(#pixelPink)" filter="url(#glow)" opacity="0.35"/>
+  <rect x="340" y="200" width="12" height="12" rx="2" fill="url(#pixelYellow)" filter="url(#glow)" opacity="0.25"/>
+  <rect x="288" y="252" width="12" height="12" rx="2" fill="url(#pixelBlue)" filter="url(#glow)" opacity="0.3"/>
+
+  <!-- Play/emulator triangle overlay on screen -->
+  <polygon points="300,180 300,260 350,220" fill="none" stroke="#60a5fa" stroke-width="2.5" opacity="0.5" stroke-linejoin="round"/>
+
+  <!-- Buttons row -->
+  <circle cx="168" cy="356" r="14" fill="#2a2a3a" stroke="#555" stroke-width="1.5"/>
+  <circle cx="168" cy="356" r="10" fill="#ec4899"/>
+
+  <circle cx="224" cy="356" r="14" fill="#2a2a3a" stroke="#555" stroke-width="1.5"/>
+  <circle cx="224" cy="356" r="10" fill="#f59e0b"/>
+
+  <circle cx="280" cy="356" r="14" fill="#2a2a3a" stroke="#555" stroke-width="1.5"/>
+  <circle cx="280" cy="356" r="10" fill="#22c55e"/>
+
+  <circle cx="336" cy="356" r="14" fill="#2a2a3a" stroke="#555" stroke-width="1.5"/>
+  <circle cx="336" cy="356" r="10" fill="#3b82f6"/>
+
+  <!-- Button labels -->
+  <text x="168" y="360" text-anchor="middle" font-family="monospace" font-size="12" font-weight="bold" fill="#fff">A</text>
+  <text x="224" y="360" text-anchor="middle" font-family="monospace" font-size="12" font-weight="bold" fill="#fff">B</text>
+  <text x="280" y="360" text-anchor="middle" font-family="monospace" font-size="12" font-weight="bold" fill="#fff">C</text>
+  <text x="336" y="360" text-anchor="middle" font-family="monospace" font-size="12" font-weight="bold" fill="#fff">D</text>
+
+  <!-- USB-C port at bottom -->
+  <rect x="230" y="412" width="52" height="12" rx="4" ry="4" fill="#1a1a28" stroke="#444" stroke-width="1"/>
+
+  <!-- LED indicator -->
+  <circle cx="384" cy="108" r="4" fill="#22c55e" filter="url(#glow)" opacity="0.8"/>
+
+  <!-- Text label at bottom -->
+  <text x="256" y="470" text-anchor="middle" font-family="monospace, 'Courier New'" font-size="22" font-weight="bold" letter-spacing="3" fill="#e2e8f0">PIMORONI</text>
+  <text x="256" y="492" text-anchor="middle" font-family="monospace, 'Courier New'" font-size="14" letter-spacing="5" fill="#64748b">EMULATOR</text>
+</svg>

@@ -1,6 +1,19 @@
-# pimoroni-emulator
+<p align="center">
+  <img src="logo.svg" width="160" alt="pimoroni-emu logo"/>
+</p>
 
-Desktop emulator for [Pimoroni](https://shop.pimoroni.com/) devices. Run MicroPython and Raspberry Pi apps on your desktop with simulated displays, buttons, and touch input.
+<h1 align="center">pimoroni-emu</h1>
+
+<p align="center">
+  <a href="https://github.com/iksaif/pimoroni-emu/actions/workflows/ci.yml"><img src="https://github.com/iksaif/pimoroni-emu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pypi.org/project/pimoroni-emulator/"><img src="https://img.shields.io/pypi/v/pimoroni-emulator" alt="PyPI"></a>
+  <a href="https://github.com/iksaif/pimoroni-emu/blob/main/LICENSE"><img src="https://img.shields.io/github/license/iksaif/pimoroni-emu" alt="License"></a>
+  <img src="https://img.shields.io/pypi/pyversions/pimoroni-emulator" alt="Python">
+</p>
+
+<p align="center">
+Desktop emulator for <a href="https://shop.pimoroni.com/">Pimoroni</a> devices. Run MicroPython and Raspberry Pi apps on your desktop with simulated displays, buttons, and touch input.
+</p>
 
 ## Screenshots
 
