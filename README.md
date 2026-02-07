@@ -19,13 +19,23 @@ Desktop emulator for <a href="https://shop.pimoroni.com/">Pimoroni</a> devices. 
 
 ## Screenshots
 
-| Tufty 2350 | Presto | Badger 2350 |
-|:-:|:-:|:-:|
-| ![Tufty 2350](screenshots/tufty.png) | ![Presto](screenshots/presto.png) | ![Badger 2350](screenshots/badger.png) |
+### Badges & displays
+
+| Tufty 2350 | Badger 2350 |
+|:-:|:-:|
+| ![Tufty 2350](screenshots/tufty.png) | ![Badger 2350](screenshots/badger.png) |
+
+### Inky
 
 | Inky Frame 7.3" | Inky Impression 5.7" |
 |:-:|:-:|
 | ![Inky Frame](screenshots/inky_frame.png) | ![Inky Impression](screenshots/inky_impression.png) |
+
+### Presto
+
+| Presto |
+|:-:|
+| ![Presto](screenshots/presto.png) |
 
 ## Install
 
