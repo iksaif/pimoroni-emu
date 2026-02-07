@@ -15,6 +15,8 @@
 Desktop emulator for <a href="https://shop.pimoroni.com/">Pimoroni</a> devices. Run MicroPython and Raspberry Pi apps on your desktop with simulated displays, buttons, and touch input.
 </p>
 
+> **Note:** This is an unofficial community project and is not affiliated with or endorsed by [Pimoroni](https://shop.pimoroni.com/).
+
 ## Screenshots
 
 | Tufty 2350 | Presto | Badger 2350 |
