@@ -24,6 +24,9 @@ def screenshot(filename: str) -> bool:
         print("[capture] No display available")
         return False
 
+    # Ensure parent directory exists
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+
     return display.screenshot(filename)
 
 
