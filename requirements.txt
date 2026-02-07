@@ -1,0 +1,6 @@
+pygame>=2.5.0
+pillow>=10.0.0
+requests>=2.31.0
+watchdog>=3.0.0
+numpy>=1.24.0
+pytest>=7.4.0

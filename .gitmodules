@@ -1,0 +1,20 @@
+[submodule "vendor/presto"]
+	path = vendor/presto
+	url = https://github.com/pimoroni/presto.git
+	ignore = untracked
+[submodule "vendor/badger2040"]
+	path = vendor/badger2040
+	url = https://github.com/pimoroni/badger2040.git
+	ignore = untracked
+[submodule "vendor/blinky2350"]
+	path = vendor/blinky2350
+	url = https://github.com/pimoroni/blinky2350
+	ignore = untracked
+[submodule "vendor/pimoroni-pico"]
+	path = vendor/pimoroni-pico
+	url = https://github.com/pimoroni/pimoroni-pico.git
+	ignore = untracked
+[submodule "vendor/inky"]
+	path = vendor/inky
+	url = https://github.com/pimoroni/inky.git
+	ignore = untracked

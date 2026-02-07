@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pimoroni-emulator"
+version = "0.1.0"
+description = "Desktop emulator for Pimoroni devices (Tufty, Presto, Badger, Blinky, Inky)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+keywords = ["pimoroni", "emulator", "micropython", "rp2350", "rp2040", "pico", "inky", "tufty", "presto", "badger"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Embedded Systems",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Emulators",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pygame>=2.5.0",
+    "pillow>=10.0.0",
+    "requests>=2.31.0",
+    "watchdog>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "numpy>=1.24.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/iksaif/pimoroni-emu"
+Repository = "https://github.com/iksaif/pimoroni-emu"
+Issues = "https://github.com/iksaif/pimoroni-emu/issues"
+
+[project.scripts]
+pimoroni-emulator = "emulator.main:main"
+
+[tool.setuptools.packages.find]
+include = ["emulator*"]
+exclude = ["vendor*", "tests*", "apps*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

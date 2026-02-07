@@ -1,0 +1,6 @@
+include LICENSE
+include README.md
+recursive-include emulator *.py
+recursive-exclude vendor *
+recursive-exclude tests *
+recursive-exclude apps *
