@@ -21,9 +21,15 @@ Desktop emulator for <a href="https://shop.pimoroni.com/">Pimoroni</a> devices. 
 
 ### Badges & displays
 
-| Tufty 2350 | Badger 2350 | Blinky 2350 |
-|:-:|:-:|:-:|
-| ![Tufty 2350](screenshots/tufty.png) | ![Badger 2350](screenshots/badger.png) | ![Blinky 2350](screenshots/blinky.png) |
+| Tufty 2350 | Badger 2350 |
+|:-:|:-:|
+| ![Tufty 2350](screenshots/tufty.png) | ![Badger 2350](screenshots/badger.png) |
+
+### Badgeware (LED matrix)
+
+| Blinky 2350 |
+|:-:|
+| ![Blinky 2350](screenshots/blinky.png) |
 
 ### Inky
 
