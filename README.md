@@ -134,7 +134,7 @@ pimoroni-emulator --device tufty --scale 3 app.py
 
 - **Memory constraints** - Basic heap tracking exists (`--memory-tracking`) via `tracemalloc` with CPython-to-MicroPython scaling, but it's approximate. True byte-accurate simulation would need a custom allocator.
 - **I2C/SPI peripherals** - Stubs return zeros. Full simulation would require modeling each breakout board's register map.
-- **PicoVector SVG** - No SVG file loading. Would need an SVG parser (e.g. via `svgpathtools` or custom).
+- **PicoVector SVG** - SVG loading supported via `Polygon.from_svg()` (emulator extension using `svgelements`). Extracts geometry only; CSS styling is not interpreted.
 
 ## Testing
 

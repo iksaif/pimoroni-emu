@@ -11,6 +11,12 @@ import sys
 from typing import List, Tuple, Optional, Any
 from emulator import get_state
 
+try:
+    import svgelements
+    _HAS_SVG = True
+except ImportError:
+    _HAS_SVG = False
+
 
 # Anti-aliasing modes
 ANTIALIAS_NONE = 0
@@ -102,6 +108,26 @@ class Polygon:
     def __init__(self):
         self._paths: List[List[Tuple[float, float]]] = []
         self._stroke = 0
+
+    @classmethod
+    def from_svg(cls, filename: str) -> "Polygon":
+        """Load polygon paths from an SVG file.
+
+        This is an emulator extension — upstream PicoVector has no SVG support.
+        """
+        resolved = _resolve_file(filename)
+        if resolved is None:
+            raise FileNotFoundError(f"SVG file not found: {filename}")
+
+        paths = _load_svg(resolved)
+        poly = cls()
+        poly._paths = paths
+
+        state = get_state()
+        if state.get("trace"):
+            print(f"[PicoVector] Polygon.from_svg({filename}) - {len(paths)} paths loaded")
+
+        return poly
 
     def path(self, *points):
         """Add a path from a list of points."""
@@ -285,6 +311,110 @@ class Polygon:
         return self
 
 
+def _linearize_path(path, tolerance: float = 1.0) -> List[List[Tuple[float, float]]]:
+    """Convert an svgelements Path into lists of (x, y) points.
+
+    Walks each sub-path/segment, linearising curves via point sampling.
+    Returns one point list per sub-path (separated by Move commands).
+    """
+    subpaths: List[List[Tuple[float, float]]] = []
+    current: List[Tuple[float, float]] = []
+
+    for seg in path.segments():
+        seg_type = type(seg).__name__
+
+        if seg_type == "Move":
+            # Start a new sub-path
+            if len(current) >= 3:
+                subpaths.append(current)
+            current = [(float(seg.end.real), float(seg.end.imag))]
+
+        elif seg_type == "Close":
+            if current and len(current) >= 3:
+                subpaths.append(current)
+            current = []
+
+        elif seg_type == "Line":
+            current.append((float(seg.end.real), float(seg.end.imag)))
+
+        elif seg_type in ("CubicBezier", "QuadraticBezier", "Arc"):
+            # Estimate number of samples from segment length
+            try:
+                length = seg.length()
+            except (ZeroDivisionError, ValueError):
+                length = 10.0
+            steps = max(4, int(length / tolerance))
+            for i in range(1, steps + 1):
+                t = i / steps
+                pt = seg.point(t)
+                current.append((float(pt.real), float(pt.imag)))
+
+        else:
+            # Unknown segment type – try to grab the endpoint
+            if hasattr(seg, "end"):
+                current.append((float(seg.end.real), float(seg.end.imag)))
+
+    if len(current) >= 3:
+        subpaths.append(current)
+
+    return subpaths
+
+
+def _load_svg(filepath: str) -> List[List[Tuple[float, float]]]:
+    """Parse an SVG file and return polygon paths.
+
+    Uses svgelements to parse shapes, paths, transforms, and viewBox.
+    All curves are linearised into point lists suitable for scanline fill.
+    """
+    if not _HAS_SVG:
+        raise ImportError(
+            "svgelements is required for SVG loading. "
+            "Install it with: pip install svgelements"
+        )
+
+    svg = svgelements.SVG.parse(filepath)
+    all_paths: List[List[Tuple[float, float]]] = []
+
+    for element in svg.elements():
+        # Skip non-shape elements
+        if not isinstance(element, svgelements.Shape):
+            continue
+
+        # Convert any shape to a Path (handles rect, circle, ellipse, polygon, etc.)
+        try:
+            path = abs(svgelements.Path(element))
+        except (ValueError, AttributeError):
+            continue
+
+        subpaths = _linearize_path(path)
+        all_paths.extend(subpaths)
+
+    return all_paths
+
+
+def _resolve_file(filename: str) -> Optional[str]:
+    """Resolve a filename relative to app dir, cwd, or sys.path."""
+    search_paths = []
+    state = get_state()
+    app_path = state.get("app_path")
+    if app_path:
+        search_paths.append(os.path.dirname(os.path.abspath(app_path)))
+    if sys.path:
+        search_paths.append(sys.path[0])
+    search_paths.append(os.getcwd())
+
+    for base in search_paths:
+        candidate = os.path.join(base, filename)
+        if os.path.isfile(candidate):
+            return candidate
+
+    # Try as absolute / relative to cwd
+    if os.path.isfile(filename):
+        return filename
+
+    return None
+
+
 def _load_af_font(filepath: str) -> Optional[dict]:
     """Parse an Alright Fonts (.af) binary file.
 
@@ -461,25 +591,9 @@ class PicoVector:
         # Try to load .af font file
         self._af_font = None
         if filename.endswith(".af"):
-            search_paths = []
-            if sys.path:
-                search_paths.append(sys.path[0])
-            search_paths.append(os.getcwd())
-            state = get_state()
-            app_path = state.get("app_path")
-            if app_path:
-                search_paths.append(os.path.dirname(os.path.abspath(app_path)))
-
-            for base in search_paths:
-                candidate = os.path.join(base, filename)
-                font = _load_af_font(candidate)
-                if font is not None:
-                    self._af_font = font
-                    break
-
-            # Also try absolute path
-            if self._af_font is None:
-                self._af_font = _load_af_font(filename)
+            resolved = _resolve_file(filename)
+            if resolved is not None:
+                self._af_font = _load_af_font(resolved)
 
         state = get_state()
         if state.get("trace"):
