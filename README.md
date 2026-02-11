@@ -125,14 +125,14 @@ pimoroni-emulator --device tufty --scale 3 app.py
 | `inky_frame` | Good | InkyFrame class |
 | `network` / `socket` | Stubs | WiFi connect, basic HTTP |
 | `jpegdec` / `pngdec` | Good | Decode via Pillow, render to framebuffer |
-| `picovector` | Partial | Basic vector/polygon support |
+| `picovector` | Good | Vectors, polygons, .af font rendering |
 | Sensors | Stubs | BME280, LTR559, LSM6DS3, QwSTPad |
 
 ## Not yet working
 
 ### Hard
 
-- **Memory constraints** - No simulation of RP2040/RP2350 RAM limits. Would need tracking allocations in mock `gc` module.
+- **Memory constraints** - Basic heap tracking exists (`--memory-tracking`) via `tracemalloc` with CPython-to-MicroPython scaling, but it's approximate. True byte-accurate simulation would need a custom allocator.
 - **I2C/SPI peripherals** - Stubs return zeros. Full simulation would require modeling each breakout board's register map.
 - **PicoVector SVG** - No SVG file loading. Would need an SVG parser (e.g. via `svgpathtools` or custom).
 

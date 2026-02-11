@@ -2,10 +2,17 @@
 
 Uses tracemalloc with filename filtering to estimate app memory usage,
 then scales CPython sizes to approximate MicroPython equivalents.
+
+Snapshots are cached and only refreshed every SAMPLE_INTERVAL seconds
+to avoid the overhead of tracemalloc.take_snapshot() on every call.
 """
 
 import os
+import time
 import tracemalloc
+
+# How often (in seconds) to take a fresh tracemalloc snapshot.
+SAMPLE_INTERVAL = 2.0
 
 
 class MemoryTracker:
@@ -24,6 +31,8 @@ class MemoryTracker:
         self._heap_size = heap_size
         self._app_dir = os.path.dirname(os.path.abspath(app_path))
         self._strict = strict
+        self._cached_alloc = 0
+        self._cache_time = 0.0
 
     def start(self):
         """Start tracemalloc. Must be called before app code runs."""
@@ -34,20 +43,22 @@ class MemoryTracker:
         if tracemalloc.is_tracing():
             tracemalloc.stop()
 
-    def get_traced_bytes(self) -> int:
-        """Sum tracemalloc allocations from app code only."""
+    def _refresh_cache(self):
+        """Take a snapshot and update cached allocation, if stale."""
+        now = time.monotonic()
+        if now - self._cache_time < SAMPLE_INTERVAL:
+            return
+        self._cache_time = now
         if not tracemalloc.is_tracing():
-            return 0
+            self._cached_alloc = 0
+            return
         snapshot = tracemalloc.take_snapshot()
-        total = 0
+        raw = 0
         for stat in snapshot.statistics("filename"):
-            if self._should_count(stat.traceback[0].filename):
-                total += stat.size
-        return total
-
-    def _should_count(self, filename: str) -> bool:
-        """True for app directory only (mocks = C firmware, not heap)."""
-        return filename.startswith(self._app_dir)
+            if stat.traceback[0].filename.startswith(self._app_dir):
+                raw += stat.size
+        scaled = int(raw * self._scale_factor(raw))
+        self._cached_alloc = min(scaled, self._heap_size)
 
     def _scale_factor(self, raw_bytes: int) -> float:
         """CPython-to-MicroPython scale factor.
@@ -64,9 +75,8 @@ class MemoryTracker:
 
     def mem_alloc(self) -> int:
         """Estimated MicroPython heap bytes allocated."""
-        raw = self.get_traced_bytes()
-        scaled = int(raw * self._scale_factor(raw))
-        return min(scaled, self._heap_size)
+        self._refresh_cache()
+        return self._cached_alloc
 
     def mem_free(self) -> int:
         """Estimated MicroPython heap bytes free."""
@@ -74,7 +84,8 @@ class MemoryTracker:
 
     def check_budget(self):
         """In strict mode, raise MemoryError if budget exceeded."""
-        if self._strict and self.mem_alloc() >= self._heap_size:
+        alloc = self.mem_alloc()
+        if self._strict and alloc >= self._heap_size:
             raise MemoryError(
-                f"Emulated heap exhausted: {self.mem_alloc()} / {self._heap_size} bytes"
+                f"Emulated heap exhausted: {alloc} / {self._heap_size} bytes"
             )

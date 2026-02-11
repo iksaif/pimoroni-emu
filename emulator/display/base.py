@@ -186,7 +186,8 @@ class BaseDisplay(ABC):
         tracker = get_state().get("memory_tracker")
         if tracker is None:
             return None
-        return (tracker.mem_alloc(), tracker.mem_alloc() + tracker.mem_free())
+        used = tracker.mem_alloc()
+        return (used, used + tracker.mem_free())
 
     def close(self):
         """Close display."""
