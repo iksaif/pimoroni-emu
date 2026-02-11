@@ -10,7 +10,7 @@ def create_display(device, headless: bool = False) -> BaseDisplay:
     """Create appropriate display renderer for device."""
     if device.display_type == "led_matrix":
         return LEDMatrixDisplay(device, headless=headless)
-    elif device.display_type == "eink":
+    elif device.display_type in ("eink", "eink_color"):
         return EInkDisplay(device, headless=headless)
     else:
         return TFTDisplay(device, headless=headless)

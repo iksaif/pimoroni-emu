@@ -152,6 +152,9 @@ def main():
         elif "badger" in app_path_str:
             device_name = "badger"
             print(f"Auto-detected device: badger (from path)")
+        elif "impression" in app_path_str or "inky_impression" in app_path_str:
+            device_name = "inky_impression"
+            print(f"Auto-detected device: inky_impression (from path)")
         elif "inky" in app_path_str:
             device_name = "inky_frame"
             print(f"Auto-detected device: inky_frame (from path)")
@@ -359,7 +362,10 @@ def run_app_interactive(
                 import traceback
                 traceback.print_exc()
         finally:
-            state["running"] = False
+            # E-ink displays retain their image, so keep the window open
+            device_obj = state.get("device")
+            if not (device_obj and getattr(device_obj, "is_eink", False)):
+                state["running"] = False
 
     thread = threading.Thread(target=app_thread, daemon=True)
     thread.start()

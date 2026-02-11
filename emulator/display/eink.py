@@ -65,7 +65,8 @@ class EInkDisplay(BaseDisplay):
         # E-ink simulation
         self._refresh_animation = False
         self._refresh_start_time = 0
-        self._refresh_duration = 0.3  # seconds
+        self._refresh_duration = 1.5  # seconds for visual refresh animation
+        self._prev_display_surface = None  # previous frame for transition
 
         # E-ink dithering pattern
         self._dither = True
@@ -105,29 +106,10 @@ class EInkDisplay(BaseDisplay):
         if get_state().get("trace"):
             print(f"[EInkDisplay] Initialized {win_size[0]}x{win_size[1]} window")
 
-    def render(self, buffer: List[List[int]]):
-        """Render framebuffer as e-ink display."""
-        self._last_buffer = buffer
-        self._frame_count += 1
-
-        # Start refresh animation
-        self._refresh_animation = True
-        self._refresh_start_time = _time.time()
-
-        # Simulate e-ink refresh delay (blocks the app thread like real hardware)
-        if not self.headless:
-            _time.sleep(self._refresh_duration)
-
-        if self.headless:
-            self._autosave_frame()
-            return
-
-        if not self._display_surface:
-            return
-
+    def _convert_buffer(self, buffer: List[List[int]]):
+        """Convert framebuffer to e-ink colors on _display_surface."""
         _init_pygame()
 
-        # Convert buffer to e-ink colors
         height = len(buffer)
         width = len(buffer[0]) if height > 0 else 0
 
@@ -137,37 +119,28 @@ class EInkDisplay(BaseDisplay):
 
                 # Check if this is an RGB packed value (from create_pen) or a pen index
                 if color > 255:
-                    # RGB packed value - extract components
                     r = (color >> 16) & 0xFF
                     g = (color >> 8) & 0xFF
                     b = color & 0xFF
                 else:
                     # Pen index (0-15 for e-ink grayscale)
-                    # Convert to grayscale: 0=black, 15=white
                     r = g = b = int(color * 255 / 15) if color <= 15 else color
 
                 if self._is_color:
-                    # Color e-ink: find nearest palette color
                     pixel_color = _find_nearest_color(r, g, b, self._palette)
-                    # Apply e-ink "paper" warmth
                     pixel_color = (
                         min(255, pixel_color[0] - 10 if pixel_color[0] > 10 else pixel_color[0]),
                         min(255, pixel_color[1] - 10 if pixel_color[1] > 10 else pixel_color[1]),
                         min(255, pixel_color[2] - 5 if pixel_color[2] > 5 else pixel_color[2])
                     )
                 else:
-                    # B&W e-ink: convert to grayscale and threshold
                     gray = int(0.299 * r + 0.587 * g + 0.114 * b)
-
-                    # E-ink is typically black on white
-                    # Threshold to black or white (with optional dithering)
                     if self._dither:
-                        # Simple ordered dithering
                         threshold = 128 + ((x % 2) * 32 - 16) + ((y % 2) * 32 - 16)
                         if gray > threshold:
-                            pixel_color = (245, 245, 240)  # E-ink white (slightly warm)
+                            pixel_color = (245, 245, 240)
                         else:
-                            pixel_color = (30, 30, 35)  # E-ink black
+                            pixel_color = (30, 30, 35)
                     else:
                         if gray > 128:
                             pixel_color = (245, 245, 240)
@@ -176,7 +149,70 @@ class EInkDisplay(BaseDisplay):
 
                 self._display_surface.set_at((x, y), pixel_color)
 
-        # Draw window
+    def render(self, buffer: List[List[int]]):
+        """Render framebuffer as e-ink display with slow refresh animation."""
+        self._last_buffer = buffer
+        self._frame_count += 1
+
+        if self.headless:
+            if self._display_surface:
+                self._convert_buffer(buffer)
+            self._autosave_frame()
+            return
+
+        if not self._display_surface:
+            return
+
+        # Save previous frame for transition
+        self._prev_display_surface = self._display_surface.copy()
+
+        # Convert new buffer to e-ink colors
+        self._convert_buffer(buffer)
+        new_surface = self._display_surface.copy()
+
+        # Animate the refresh: invert flash -> black -> progressive reveal
+        self._refresh_animation = True
+        self._refresh_start_time = _time.time()
+        disp_h = self.device.display_height
+
+        phase_invert = 0.15   # brief invert
+        phase_black = 0.15    # brief black
+        phase_reveal = self._refresh_duration - phase_invert - phase_black
+
+        while True:
+            elapsed = _time.time() - self._refresh_start_time
+            if elapsed >= self._refresh_duration:
+                break
+
+            if elapsed < phase_invert:
+                # Phase 1: invert the old image
+                inverted = self._prev_display_surface.copy()
+                inverted.fill((255, 255, 255))
+                inverted.blit(self._prev_display_surface, (0, 0),
+                              special_flags=pygame.BLEND_RGB_SUB)
+                self._display_surface = inverted
+            elif elapsed < phase_invert + phase_black:
+                # Phase 2: black flash
+                self._display_surface.fill((30, 30, 35))
+            else:
+                # Phase 3: progressive top-to-bottom reveal
+                reveal_t = (elapsed - phase_invert - phase_black) / phase_reveal
+                reveal_row = int(reveal_t * disp_h)
+
+                # Start from blank (e-ink white) and reveal new content top-down
+                self._display_surface.fill((245, 245, 240))
+                self._display_surface.blit(
+                    new_surface,
+                    (0, 0),
+                    (0, 0, self.device.display_width, reveal_row),
+                )
+
+            self._draw_window()
+            _time.sleep(0.016)  # ~60 fps animation
+
+        # Final: show complete new image
+        self._display_surface = new_surface
+        self._refresh_animation = False
         self._draw_window()
 
         # Autosave if enabled
@@ -204,25 +240,6 @@ class EInkDisplay(BaseDisplay):
         bezel_rect = (disp_rect[0] - 8, disp_rect[1] - 8,
                       disp_rect[2] + 16, disp_rect[3] + 16)
         pygame.draw.rect(self._window, bezel_color, bezel_rect, border_radius=4)
-
-        # Simulate refresh animation
-        if self._refresh_animation:
-            elapsed = _time.time() - self._refresh_start_time
-            if elapsed < self._refresh_duration:
-                # Flash effect during refresh
-                progress = elapsed / self._refresh_duration
-                if progress < 0.3:
-                    # Invert colors briefly using pixel array (avoids Metal crash)
-                    inverted = scaled.copy()
-                    arr = pygame.surfarray.pixels3d(inverted)
-                    arr[:] = 255 - arr
-                    del arr  # Release surface lock
-                    scaled = inverted
-                elif progress < 0.6:
-                    # Black flash
-                    scaled.fill((30, 30, 35))
-            else:
-                self._refresh_animation = False
 
         # Draw display
         self._window.blit(scaled, (disp_rect[0], disp_rect[1]))
@@ -262,7 +279,7 @@ class EInkDisplay(BaseDisplay):
             draw_memory_bar(pygame, self._window, 10, 28, 150, mem[0], mem[1])
 
     def _draw_buttons(self):
-        """Draw button indicators with LED dots for Inky Frame."""
+        """Draw button indicators with LED dots."""
         state = get_state()
         buttons = state.get("buttons", {})
         leds = state.get("leds", {})
@@ -270,35 +287,58 @@ class EInkDisplay(BaseDisplay):
         if not self.device.buttons:
             return
 
-        win_h = self.device.get_window_size()[1]
         font = pygame.font.SysFont("monospace", 12)
+        has_button_leds = getattr(self.device, 'has_button_leds', False)
 
-        x = 10
-        for btn_config in self.device.buttons:
-            btn = buttons.get(btn_config.pin)
-            pressed = btn._pressed if btn else False
+        if has_button_leds:
+            # Inky Frame layout: buttons vertically along the left edge
+            disp_rect = self.device.get_display_rect()
+            btn_x = disp_rect[0] - 38  # left of the display bezel
+            disp_top = disp_rect[1]
+            disp_h = disp_rect[3]
+            n = len(self.device.buttons)
+            spacing = disp_h / (n + 1)
 
-            color = (80, 150, 80) if pressed else (100, 100, 100)
-            pygame.draw.rect(
-                self._window,
-                color,
-                (x, win_h - 30, 40, 20),
-                border_radius=3
-            )
+            for i, btn_config in enumerate(self.device.buttons):
+                btn = buttons.get(btn_config.pin)
+                pressed = btn._pressed if btn else False
+                btn_y = int(disp_top + spacing * (i + 1))
 
-            text = font.render(btn_config.name, True, (255, 255, 255))
-            text_rect = text.get_rect(center=(x + 20, win_h - 20))
-            self._window.blit(text, text_rect)
+                # Button
+                color = (80, 150, 80) if pressed else (100, 100, 100)
+                pygame.draw.rect(
+                    self._window, color,
+                    (btn_x, btn_y - 10, 24, 20),
+                    border_radius=3,
+                )
+                text = font.render(btn_config.name, True, (255, 255, 255))
+                text_rect = text.get_rect(center=(btn_x + 12, btn_y))
+                self._window.blit(text, text_rect)
 
-            # Draw button LED (small dot above button)
-            if getattr(self.device, 'has_button_leds', False):
+                # LED dot to the left of button
                 led_key = f"button_{btn_config.name.lower()}_led"
                 led = leds.get(led_key)
                 led_on = led and led.is_on if led else False
                 led_color = (255, 255, 200) if led_on else (60, 60, 55)
-                pygame.draw.circle(self._window, led_color, (x + 20, win_h - 38), 4)
+                pygame.draw.circle(self._window, led_color, (btn_x - 8, btn_y), 4)
+        else:
+            # Badger / generic layout: buttons horizontally at the bottom
+            win_h = self.device.get_window_size()[1]
+            x = 10
+            for btn_config in self.device.buttons:
+                btn = buttons.get(btn_config.pin)
+                pressed = btn._pressed if btn else False
 
-            x += 50
+                color = (80, 150, 80) if pressed else (100, 100, 100)
+                pygame.draw.rect(
+                    self._window, color,
+                    (x, win_h - 30, 40, 20),
+                    border_radius=3,
+                )
+                text = font.render(btn_config.name, True, (255, 255, 255))
+                text_rect = text.get_rect(center=(x + 20, win_h - 20))
+                self._window.blit(text, text_rect)
+                x += 50
 
         # Draw busy/activity LED
         if getattr(self.device, 'has_busy_led', False):
@@ -306,10 +346,47 @@ class EInkDisplay(BaseDisplay):
             busy_on = busy_led and busy_led.is_on if busy_led else False
             busy_color = (255, 180, 50) if busy_on else (60, 60, 55)
             win_w = self.device.get_window_size()[0]
+            win_h = self.device.get_window_size()[1]
             pygame.draw.circle(self._window, busy_color, (win_w - 20, win_h - 20), 6)
             font_sm = pygame.font.SysFont("monospace", 10)
             label = font_sm.render("BUSY", True, (120, 120, 120))
             self._window.blit(label, (win_w - 42, win_h - 34))
+
+    def refresh_ui(self):
+        """Redraw window to update UI elements (buttons) without a new render."""
+        if not self.headless and self._display_surface:
+            self._draw_window()
+
+    def get_button_at(self, x: int, y: int) -> str | None:
+        """Return the key name of the button at window coords (x, y), or None."""
+        if not self.device.buttons:
+            return None
+
+        has_button_leds = getattr(self.device, 'has_button_leds', False)
+
+        if has_button_leds:
+            # Inky Frame: vertical buttons along the left edge
+            disp_rect = self.device.get_display_rect()
+            btn_x = disp_rect[0] - 38
+            disp_top = disp_rect[1]
+            disp_h = disp_rect[3]
+            n = len(self.device.buttons)
+            spacing = disp_h / (n + 1)
+
+            for i, btn_config in enumerate(self.device.buttons):
+                btn_y = int(disp_top + spacing * (i + 1))
+                if btn_x <= x < btn_x + 24 and btn_y - 10 <= y < btn_y + 10:
+                    return btn_config.key
+        else:
+            # Badger: horizontal buttons at the bottom
+            win_h = self.device.get_window_size()[1]
+            bx = 10
+            for btn_config in self.device.buttons:
+                if bx <= x < bx + 40 and win_h - 30 <= y < win_h - 10:
+                    return btn_config.key
+                bx += 50
+
+        return None
 
     def get_surface(self):
         """Get pygame surface or PIL Image."""
