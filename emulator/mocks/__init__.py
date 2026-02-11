@@ -19,12 +19,26 @@ _vfs_root = None
 def _translate_path(path: str) -> str:
     """Translate MicroPython absolute path to host filesystem path.
 
-    Only translates paths that look like MicroPython device paths:
-    - /badges/, /examples/, /icons/, /images/, /books/
-    - Not system paths like /tmp/, /private/, /Users/, /var/, etc.
+    Checks uos mount points first (e.g. /sd/), then translates known
+    MicroPython device paths like /badges/, /examples/, etc.
     """
+    if not isinstance(path, str):
+        return path
+
+    # Check uos mount points (works even without VFS enabled)
+    if path.startswith("/"):
+        try:
+            from emulator.mocks import uos
+            mount_points = getattr(uos, '_mount_points', {})
+            for mount_path, local_path in sorted(mount_points.items(), key=lambda x: -len(x[0])):
+                if path == mount_path or path.startswith(mount_path + "/"):
+                    remainder = path[len(mount_path):].lstrip("/")
+                    return str(Path(local_path) / remainder)
+        except ImportError:
+            pass
+
     global _vfs_root
-    if not _vfs_enabled or not _vfs_root or not isinstance(path, str):
+    if not _vfs_enabled or not _vfs_root:
         return path
 
     # Only translate known MicroPython filesystem paths

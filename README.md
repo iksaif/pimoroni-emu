@@ -130,13 +130,6 @@ pimoroni-emulator --device tufty --scale 3 app.py
 
 ## Not yet working
 
-### Easy
-
-- **Blinky + PicoGraphics** - Blinky apps using PicoGraphics fail to import `pimoroni`. Fix: register `pimoroni` in `install_badgeware_mocks()` before app thread starts (race condition).
-- **E-ink refresh timing** - Display updates instantly. Fix: add optional `time.sleep()` in e-ink `render()`.
-- **Audio/buzzer** - Silently ignored. Fix: use `pygame.mixer` to play tones.
-- **SD card I/O** - The `SDCard` class maps to a temp dir but `uos.mount()` doesn't wire it up. Fix: translate `/sd/` paths in `_vfs_open()`.
-
 ### Medium
 
 - **PicoVector fonts** - Polygons/shapes work, but text falls back to bitmap font. Fix: parse `.af` font files (Alright Fonts, simple binary format) and rasterize glyphs as polygons.

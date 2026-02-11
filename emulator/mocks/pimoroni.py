@@ -102,12 +102,45 @@ class RGBLED:
 
 
 class Buzzer:
-    """Piezo buzzer controller."""
+    """Piezo buzzer controller with audio output via pygame.mixer."""
 
     def __init__(self, pin: int):
         self._pin = pin
         self._frequency = 0
         self._duty = 0
+        self._channel = None
+        self._sound = None
+        self._audio_init = False
+
+    def _ensure_audio(self):
+        """Lazy-init pygame mixer for audio output."""
+        if self._audio_init:
+            return True
+        if get_state().get("headless"):
+            return False
+        try:
+            import pygame
+            if not pygame.mixer.get_init():
+                pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
+            self._audio_init = True
+            return True
+        except Exception:
+            return False
+
+    def _generate_tone(self, freq: int, duty: float = 0.5):
+        """Generate a square wave tone as a pygame Sound."""
+        import pygame
+        import array
+        sample_rate = 44100
+        duration_samples = sample_rate  # 1 second looping buffer
+        buf = array.array('h')  # signed 16-bit
+        amplitude = 16000
+        period = sample_rate / freq if freq > 0 else 1
+        for i in range(duration_samples):
+            phase = (i % int(period)) / period if period > 0 else 0
+            val = amplitude if phase < duty else -amplitude
+            buf.append(int(val))
+        return pygame.mixer.Sound(buffer=buf)
 
     def set_tone(self, frequency: int, duty: float = 0.5):
         """Set buzzer tone."""
@@ -116,10 +149,22 @@ class Buzzer:
         if get_state().get("trace"):
             print(f"[Buzzer] Tone {frequency}Hz, duty {duty}")
 
+        if not self._ensure_audio():
+            return
+
+        if self._channel and self._channel.get_busy():
+            self._channel.stop()
+
+        if frequency > 20:
+            import pygame
+            self._sound = self._generate_tone(frequency, duty)
+            self._channel = self._sound.play(loops=-1)
+        else:
+            self._sound = None
+
     def stop(self):
         """Stop buzzer."""
-        self._frequency = 0
-        self._duty = 0
+        self.set_tone(0)
 
 
 class Analog:

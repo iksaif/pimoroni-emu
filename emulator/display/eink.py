@@ -114,6 +114,10 @@ class EInkDisplay(BaseDisplay):
         self._refresh_animation = True
         self._refresh_start_time = _time.time()
 
+        # Simulate e-ink refresh delay (blocks the app thread like real hardware)
+        if not self.headless:
+            _time.sleep(self._refresh_duration)
+
         if self.headless:
             self._autosave_frame()
             return

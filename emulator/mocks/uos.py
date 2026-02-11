@@ -19,13 +19,24 @@ def _get_vfs_root() -> str:
 def _translate_path(path: str) -> str:
     """Translate MicroPython absolute path to host filesystem path.
 
-    Paths like "/badges/badge.txt" are redirected to the virtual filesystem.
+    Checks mount points first (e.g. /sd/ -> local dir), then falls back
+    to the VFS root for paths like "/badges/badge.txt".
     """
     if not path:
         return path
 
     # If it's an absolute path (starts with /)
     if path.startswith("/"):
+        # Check mount points first (longest prefix match)
+        for mount_path, local_path in sorted(_mount_points.items(), key=lambda x: -len(x[0])):
+            if path == mount_path or path.startswith(mount_path + "/"):
+                remainder = path[len(mount_path):].lstrip("/")
+                translated = _real_os.path.join(local_path, remainder)
+                state = get_state()
+                if state.get("trace"):
+                    print(f"[uos] Translating '{path}' -> '{translated}' (mount: {mount_path})")
+                return translated
+
         vfs_root = _get_vfs_root()
         translated = _real_os.path.join(vfs_root, path.lstrip("/"))
 
@@ -110,14 +121,34 @@ def sync():
     pass
 
 
+_mount_points = {}
+
+
 def mount(filesystem, path: str, readonly: bool = False):
-    """Mount a filesystem (stub)."""
-    pass
+    """Mount a filesystem at a given path.
+
+    For SDCard objects, maps the mount path to the SDCard's local directory.
+    """
+    local_path = None
+    if hasattr(filesystem, 'get_path'):
+        local_path = str(filesystem.get_path())
+    elif hasattr(filesystem, '_path'):
+        local_path = str(filesystem._path)
+
+    if local_path:
+        # Normalize mount path (ensure it starts with / and has no trailing /)
+        mount_path = "/" + path.strip("/")
+        _mount_points[mount_path] = local_path
+
+        state = get_state()
+        if state.get("trace"):
+            print(f"[uos] Mounted '{mount_path}' -> '{local_path}'")
 
 
 def umount(path: str):
-    """Unmount a filesystem (stub)."""
-    pass
+    """Unmount a filesystem."""
+    mount_path = "/" + path.strip("/")
+    _mount_points.pop(mount_path, None)
 
 
 def dupterm(stream, index: int = 0):
