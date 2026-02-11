@@ -6,26 +6,10 @@ from emulator.devices.base import BaseDevice
 
 
 class WiFiManager:
-    """Manages WiFi simulation and optional real network access."""
+    """Manages WiFi simulation (network requests pass through to host)."""
 
-    def __init__(self, device: BaseDevice, use_real_network: bool = False):
+    def __init__(self, device: BaseDevice):
         self.device = device
-        self._use_real_network = use_real_network
-
-        if use_real_network:
-            get_state()["real_network"] = True
-
-    def set_real_network(self, enabled: bool):
-        """Enable or disable real network access."""
-        self._use_real_network = enabled
-        get_state()["real_network"] = enabled
-
-        if get_state().get("trace"):
-            print(f"[WiFi] Real network: {enabled}")
-
-    def is_real_network(self) -> bool:
-        """Check if using real network."""
-        return self._use_real_network
 
     def get_status(self) -> dict:
         """Get WiFi status."""

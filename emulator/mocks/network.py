@@ -66,13 +66,6 @@ class WLAN:
         if get_state().get("trace"):
             print(f"[WLAN] Connecting to '{ssid}'...")
 
-        # In emulator, we simulate instant connection
-        # or can use real network if configured
-        state = get_state()
-        if state.get("real_network"):
-            # Actually try to connect (not implemented - would need platform-specific code)
-            pass
-
         # Simulate successful connection
         self._connected = True
         self._ip = "192.168.1.100"

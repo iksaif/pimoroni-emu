@@ -123,9 +123,9 @@ pimoroni-emulator --device tufty --scale 3 app.py
 | `badgeware` | Partial | Drawing API for Blinky |
 | `inky` | Good | Inky, InkyImpression, auto-detect |
 | `inky_frame` | Good | InkyFrame class |
-| `network` / `socket` | Stubs | WiFi connect, basic HTTP |
+| `network` / `socket` | Good | WiFi connect, sockets pass through to host |
 | `jpegdec` / `pngdec` | Good | Decode via Pillow, render to framebuffer |
-| `picovector` | Good | Vectors, polygons, .af font rendering |
+| `picovector` | Good | Vectors, polygons, .af fonts, SVG loading |
 | Sensors | Stubs | BME280, LTR559, LSM6DS3, QwSTPad |
 
 ## Not yet working
@@ -134,7 +134,6 @@ pimoroni-emulator --device tufty --scale 3 app.py
 
 - **Memory constraints** - Basic heap tracking exists (`--memory-tracking`) via `tracemalloc` with CPython-to-MicroPython scaling, but it's approximate. True byte-accurate simulation would need a custom allocator.
 - **I2C/SPI peripherals** - Stubs return zeros. Full simulation would require modeling each breakout board's register map.
-- **PicoVector SVG** - SVG loading supported via `Polygon.from_svg()` (emulator extension using `svgelements`). Extracts geometry only; CSS styling is not interpreted.
 
 ## Testing
 

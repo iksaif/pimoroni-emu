@@ -1,6 +1,6 @@
 """Mock implementation of MicroPython's socket module.
 
-Can optionally use real sockets for actual network testing.
+Uses real sockets so that network requests pass through to the host.
 """
 
 import socket as _socket
@@ -30,19 +30,13 @@ class socket:
         self._af = af
         self._type = socktype
         self._proto = proto
-        self._real_socket: Optional[_socket.socket] = None
         self._connected = False
         self._blocking = True
         self._timeout = None
+        self._real_socket = _socket.socket(af, socktype, proto)
 
-        # Use real sockets if configured
-        state = get_state()
-        if state.get("real_network"):
-            self._real_socket = _socket.socket(af, socktype, proto)
-
-        if state.get("trace"):
-            real_str = "(real)" if self._real_socket else "(mock)"
-            print(f"[socket] Created {real_str} af={af} type={socktype}")
+        if get_state().get("trace"):
+            print(f"[socket] Created af={af} type={socktype}")
 
     def connect(self, address: Tuple[str, int]):
         """Connect to remote address."""
@@ -178,8 +172,4 @@ def getaddrinfo(
     if get_state().get("trace"):
         print(f"[socket] getaddrinfo({host}, {port})")
 
-    if get_state().get("real_network"):
-        return _socket.getaddrinfo(host, port, af, socktype, proto, flags)
-
-    # Mock response
-    return [(AF_INET, SOCK_STREAM, 0, "", (host, port))]
+    return _socket.getaddrinfo(host, port, af, socktype, proto, flags)
