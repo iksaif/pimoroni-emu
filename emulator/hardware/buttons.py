@@ -110,6 +110,11 @@ class ButtonManager:
             pygame.K_ESCAPE: "escape",
             pygame.K_r: "r",
             pygame.K_q: "q",
+            pygame.K_z: "z",
+            pygame.K_x: "x",
+            pygame.K_v: "v",
+            pygame.K_MINUS: "-",
+            pygame.K_EQUALS: "=",
         }
 
         return key_map.get(pygame_key)

@@ -196,6 +196,9 @@ class LEDMatrixDisplay(BaseDisplay):
         # Draw button indicators
         self._draw_buttons()
 
+        # Draw QwSTPad gamepad widget if registered
+        self._draw_qwstpad()
+
         # Draw sensor panel if sensors are active
         if self._sensor_panel:
             self._sensor_panel.update()
@@ -278,6 +281,111 @@ class LEDMatrixDisplay(BaseDisplay):
             if bx <= x < bx + 40 and win_h - 30 <= y < win_h - 10:
                 return btn_config.key
             bx += 50
+        return None
+
+    def _get_qwstpad_layout(self):
+        """Compute QwSTPad widget button positions."""
+        state = get_state()
+        if "qwstpad" not in state:
+            return None
+
+        win_w = self._window.get_width()
+        win_h = self._window.get_height()
+
+        btn_size = 28
+        gap = 4
+        # Position below the LED grid + device buttons
+        grid_bottom = (40 + self.device.display_height * self._led_spacing +
+                       self._led_spacing + 10)
+        base_y = max(grid_bottom + 35, win_h - btn_size * 3 - gap * 2 - 20)
+        center_x = 50 + (self.device.display_width * self._led_spacing) // 2
+
+        buttons = []
+        # D-pad
+        dpad_cx = center_x - 80
+        dpad_cy = base_y + btn_size + gap
+        buttons.append(("up",    (dpad_cx, dpad_cy - btn_size - gap, btn_size, btn_size), "U"))
+        buttons.append(("down",  (dpad_cx, dpad_cy + btn_size + gap, btn_size, btn_size), "D"))
+        buttons.append(("left",  (dpad_cx - btn_size - gap, dpad_cy, btn_size, btn_size), "L"))
+        buttons.append(("right", (dpad_cx + btn_size + gap, dpad_cy, btn_size, btn_size), "R"))
+
+        # Face buttons (diamond)
+        face_cx = center_x + 80
+        face_cy = dpad_cy
+        buttons.append(("z", (face_cx, face_cy + btn_size + gap, btn_size, btn_size), "A"))
+        buttons.append(("x", (face_cx + btn_size + gap, face_cy, btn_size, btn_size), "B"))
+        buttons.append(("c", (face_cx, face_cy - btn_size - gap, btn_size, btn_size), "X"))
+        buttons.append(("v", (face_cx - btn_size - gap, face_cy, btn_size, btn_size), "Y"))
+
+        # +/- buttons
+        buttons.append(("=", (center_x + 10, dpad_cy - 5, btn_size, btn_size // 2 + 4), "+"))
+        buttons.append(("-", (center_x - 10 - btn_size, dpad_cy - 5, btn_size, btn_size // 2 + 4), "-"))
+
+        return buttons
+
+    def _draw_qwstpad(self):
+        """Draw QwSTPad gamepad widget if registered."""
+        layout = self._get_qwstpad_layout()
+        if not layout:
+            return
+
+        # Resize window if needed
+        last_btn_bottom = max(r[1] + r[3] for _, r, _ in layout) + 10
+        win_w, win_h = self._window.get_size()
+        if last_btn_bottom > win_h and not getattr(self, '_qwstpad_resized', False):
+            self._qwstpad_resized = True
+            self._window = pygame.display.set_mode((win_w, last_btn_bottom + 10))
+            return
+
+        state = get_state()
+        bitmask = state.get("qwstpad_buttons", 0)
+        qwstpad = state.get("qwstpad")
+
+        from emulator.mocks.qwstpad import KEY_TO_BUTTON
+
+        font = pygame.font.SysFont("monospace", 13, bold=True)
+
+        for key_name, rect, label in layout:
+            x, y, w, h = rect
+            mask = KEY_TO_BUTTON.get(key_name, 0)
+            pressed = bool(bitmask & mask)
+
+            if pressed:
+                bg_color = (80, 200, 80)
+                text_color = (0, 0, 0)
+            else:
+                bg_color = (60, 60, 65)
+                text_color = (200, 200, 200)
+
+            pygame.draw.rect(self._window, bg_color, (x, y, w, h), border_radius=4)
+            pygame.draw.rect(self._window, (90, 90, 95), (x, y, w, h), 1, border_radius=4)
+
+            text = font.render(label, True, text_color)
+            text_rect = text.get_rect(center=(x + w // 2, y + h // 2))
+            self._window.blit(text, text_rect)
+
+        # LED indicators
+        if qwstpad:
+            led_states = qwstpad._led_states
+            led_y = layout[0][1][1] - 20
+            center_x = 50 + (self.device.display_width * self._led_spacing) // 2
+            led_start_x = center_x - 30
+            for i in range(4):
+                lx = led_start_x + i * 16
+                lit = bool(led_states & (1 << i))
+                color = (0, 255, 100) if lit else (35, 35, 40)
+                pygame.draw.circle(self._window, color, (lx + 4, led_y + 4), 5)
+                pygame.draw.circle(self._window, (70, 70, 75), (lx + 4, led_y + 4), 5, 1)
+
+    def get_qwstpad_button_at(self, x: int, y: int) -> str | None:
+        """Return the key name of the QwSTPad button at (x, y), or None."""
+        layout = self._get_qwstpad_layout()
+        if not layout:
+            return None
+        for key_name, rect, _label in layout:
+            bx, by, bw, bh = rect
+            if bx <= x < bx + bw and by <= y < by + bh:
+                return key_name
         return None
 
     def handle_mouse(self, x: int, y: int, pressed: bool) -> bool:

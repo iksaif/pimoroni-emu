@@ -331,6 +331,19 @@ def run_app_headless(app_path: Path, max_frames: int = 0):
     thread.join(timeout=1.0)
 
 
+def _handle_qwstpad_key(state: dict, key_name: str, pressed: bool):
+    """Update QwSTPad button bitmask from keyboard input."""
+    from emulator.mocks.qwstpad import KEY_TO_BUTTON
+    mask = KEY_TO_BUTTON.get(key_name)
+    if mask is None or "qwstpad" not in state:
+        return
+    buttons = state.get("qwstpad_buttons", 0)
+    if pressed:
+        state["qwstpad_buttons"] = buttons | mask
+    else:
+        state["qwstpad_buttons"] = buttons & ~mask
+
+
 def run_app_interactive(
     app_path: Path,
     device,
@@ -392,11 +405,13 @@ def run_app_interactive(
                         print("Reset not implemented yet")
                     else:
                         button_manager.handle_key_down(key_name)
+                        _handle_qwstpad_key(state, key_name, pressed=True)
 
             elif event.type == pygame.KEYUP:
                 key_name = button_manager.pygame_key_to_name(event.key)
                 if key_name:
                     button_manager.handle_key_up(key_name)
+                    _handle_qwstpad_key(state, key_name, pressed=False)
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click
@@ -407,6 +422,17 @@ def run_app_interactive(
                     if btn_key:
                         mouse_held_button = btn_key
                         button_manager.handle_key_down(btn_key)
+                        _handle_qwstpad_key(state, btn_key, pressed=True)
+                        if hasattr(display, 'refresh_ui'):
+                            display.refresh_ui()
+                        continue
+                    # Check QwSTPad gamepad widget
+                    qwstpad_key = None
+                    if hasattr(display, 'get_qwstpad_button_at'):
+                        qwstpad_key = display.get_qwstpad_button_at(*event.pos)
+                    if qwstpad_key:
+                        mouse_held_button = qwstpad_key
+                        _handle_qwstpad_key(state, qwstpad_key, pressed=True)
                         if hasattr(display, 'refresh_ui'):
                             display.refresh_ui()
                         continue
@@ -420,6 +446,7 @@ def run_app_interactive(
                     # Release button held by mouse
                     if mouse_held_button:
                         button_manager.handle_key_up(mouse_held_button)
+                        _handle_qwstpad_key(state, mouse_held_button, pressed=False)
                         mouse_held_button = None
                         if hasattr(display, 'refresh_ui'):
                             display.refresh_ui()
