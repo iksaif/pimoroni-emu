@@ -52,6 +52,11 @@ class ButtonManager:
         btn = buttons.get(pin)
         if btn:
             btn._press()
+            # Buttons are active-low with PULL_UP: pressed = value 0 (falling edge)
+            from emulator.mocks.machine import Pin
+            pin_obj = Pin.get_pin(pin)
+            if pin_obj:
+                pin_obj._trigger_irq(0)
 
     def _release_button(self, pin: int):
         """Release a button by pin number."""
@@ -60,6 +65,11 @@ class ButtonManager:
         btn = buttons.get(pin)
         if btn:
             btn._release()
+            # Buttons are active-low with PULL_UP: released = value 1 (rising edge)
+            from emulator.mocks.machine import Pin
+            pin_obj = Pin.get_pin(pin)
+            if pin_obj:
+                pin_obj._trigger_irq(1)
 
     def is_pressed(self, pin: int) -> bool:
         """Check if button is pressed by pin."""

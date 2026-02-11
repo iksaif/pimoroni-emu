@@ -268,6 +268,18 @@ class LEDMatrixDisplay(BaseDisplay):
         if not self.headless and self._window and self._ready_buffer:
             self._draw_window()
 
+    def get_button_at(self, x: int, y: int) -> str | None:
+        """Return the key name of the button indicator at (x, y), or None."""
+        if not self.device.buttons or not self._window:
+            return None
+        win_h = self._window.get_height()
+        bx = 10
+        for btn_config in self.device.buttons:
+            if bx <= x < bx + 40 and win_h - 30 <= y < win_h - 10:
+                return btn_config.key
+            bx += 50
+        return None
+
     def handle_mouse(self, x: int, y: int, pressed: bool) -> bool:
         """Handle mouse events. Returns True if event was consumed by UI."""
         if self._sensor_panel and self._sensor_panel.has_sensors():

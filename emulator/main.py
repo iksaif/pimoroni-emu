@@ -69,12 +69,6 @@ Supported devices: tufty, blinky, presto, badger
     )
 
     parser.add_argument(
-        "--real-network",
-        action="store_true",
-        help="Use real network for WiFi operations",
-    )
-
-    parser.add_argument(
         "--max-frames",
         type=int,
         default=0,
@@ -249,7 +243,7 @@ def main():
     button_manager = ButtonManager(device)
     touch_manager = TouchManager(device)
     sensor_manager = SensorManager(device)
-    wifi_manager = WiFiManager(device, use_real_network=args.real_network)
+    wifi_manager = WiFiManager(device)
 
     # Run the app
     try:
@@ -372,6 +366,7 @@ def run_app_interactive(
 
     # Main event loop
     clock = pygame.time.Clock()
+    mouse_held_button = None  # Track button held by mouse click
 
     while state["running"]:
         # Handle pygame events
@@ -399,6 +394,16 @@ def run_app_interactive(
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click
+                    # Check if clicking a button indicator
+                    btn_key = None
+                    if hasattr(display, 'get_button_at'):
+                        btn_key = display.get_button_at(*event.pos)
+                    if btn_key:
+                        mouse_held_button = btn_key
+                        button_manager.handle_key_down(btn_key)
+                        if hasattr(display, 'refresh_ui'):
+                            display.refresh_ui()
+                        continue
                     # Check if display UI wants to handle this
                     if hasattr(display, 'handle_mouse') and display.handle_mouse(*event.pos, True):
                         continue  # Event consumed by UI
@@ -406,6 +411,13 @@ def run_app_interactive(
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
+                    # Release button held by mouse
+                    if mouse_held_button:
+                        button_manager.handle_key_up(mouse_held_button)
+                        mouse_held_button = None
+                        if hasattr(display, 'refresh_ui'):
+                            display.refresh_ui()
+                        continue
                     # Check if display UI wants to handle this
                     if hasattr(display, 'handle_mouse') and display.handle_mouse(*event.pos, False):
                         continue  # Event consumed by UI

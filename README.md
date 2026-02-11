@@ -130,13 +130,6 @@ pimoroni-emulator --device tufty --scale 3 app.py
 
 ## Not yet working
 
-### Medium
-
-- **PicoVector fonts** - Polygons/shapes work, but text falls back to bitmap font. Fix: parse `.af` font files (Alright Fonts, simple binary format) and rasterize glyphs as polygons.
-- **Hardware interrupts** - `Pin.irq()` stores handlers but nothing calls `_trigger_irq()` from the button manager. Fix: wire `ButtonManager.handle_key_down()` to `Pin._trigger_irq()`.
-- **Real WiFi bridging** - `--real-network` flag exists but doesn't actually connect. Fix: implement using `socket`/`requests` passthrough for `urequests` and `usocket`.
-- **Sensor panel interactivity** - Sliders exist for battery but not for light/temperature. Fix: add sensor value sliders to `SensorPanel`.
-
 ### Hard
 
 - **Memory constraints** - No simulation of RP2040/RP2350 RAM limits. Would need tracking allocations in mock `gc` module.

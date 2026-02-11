@@ -43,7 +43,12 @@ class Pin:
         self.id = id
         self._mode = mode if mode != -1 else Pin.IN
         self._pull = pull
-        self._value = value if value is not None else 0
+        if value is not None:
+            self._value = value
+        elif pull == Pin.PULL_UP:
+            self._value = 1  # PULL_UP defaults high
+        else:
+            self._value = 0
         self._irq_handler: Optional[Callable] = None
         self._irq_trigger = 0
         Pin._pins[id] = self
@@ -84,10 +89,18 @@ class Pin:
         self._irq_handler = handler
         self._irq_trigger = trigger
 
-    def _trigger_irq(self):
-        """Called by emulator to simulate interrupt."""
+    def _trigger_irq(self, new_value: int):
+        """Called by emulator to simulate interrupt with edge detection."""
+        old_value = self._value
+        self._value = new_value
         if self._irq_handler:
-            self._irq_handler(self)
+            fire = False
+            if old_value == 0 and new_value == 1:
+                fire = bool(self._irq_trigger & Pin.IRQ_RISING)
+            elif old_value == 1 and new_value == 0:
+                fire = bool(self._irq_trigger & Pin.IRQ_FALLING)
+            if fire:
+                self._irq_handler(self)
 
     @classmethod
     def get_pin(cls, id: int) -> Optional["Pin"]:

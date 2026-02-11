@@ -5,6 +5,9 @@ using PicoGraphics as the rendering backend.
 """
 
 import math
+import os
+import struct
+import sys
 from typing import List, Tuple, Optional, Any
 from emulator import get_state
 
@@ -282,6 +285,80 @@ class Polygon:
         return self
 
 
+def _load_af_font(filepath: str) -> Optional[dict]:
+    """Parse an Alright Fonts (.af) binary file.
+
+    Returns a dict mapping codepoint -> glyph data, or None on failure.
+    Format reference: vendor/pimoroni-pico/libraries/pico_vector/alright-fonts.h
+    """
+    try:
+        with open(filepath, "rb") as f:
+            data = f.read()
+    except (OSError, IOError):
+        return None
+
+    if len(data) < 12 or data[:4] != b"af!?":
+        return None
+
+    flags, glyph_count, path_count, point_count = struct.unpack_from(">HHHH", data, 4)
+    flag_16bit = flags & 0x0001
+
+    offset = 12
+    glyphs = []
+    for _ in range(glyph_count):
+        if offset + 8 > len(data):
+            return None
+        cp, gx, gy, gw, gh, advance, pc = struct.unpack_from(">HbbBBBB", data, offset)
+        glyphs.append({
+            "codepoint": cp, "x": gx, "y": gy, "w": gw, "h": gh,
+            "advance": advance, "path_count": pc, "paths": [],
+        })
+        offset += 8
+
+    # Read path point counts
+    path_point_counts = []
+    for _ in range(path_count):
+        if flag_16bit:
+            if offset + 2 > len(data):
+                return None
+            (pc,) = struct.unpack_from(">H", data, offset)
+            offset += 2
+        else:
+            if offset + 1 > len(data):
+                return None
+            pc = data[offset]
+            offset += 1
+        path_point_counts.append(pc)
+
+    # Read all points
+    all_points = []
+    for _ in range(point_count):
+        if offset + 2 > len(data):
+            return None
+        px, py = data[offset], data[offset + 1]
+        all_points.append((float(px), float(py)))
+        offset += 2
+
+    # Assign paths and points to glyphs
+    path_idx = 0
+    point_idx = 0
+    for glyph in glyphs:
+        for _ in range(glyph["path_count"]):
+            if path_idx >= len(path_point_counts):
+                break
+            n_pts = path_point_counts[path_idx]
+            path_idx += 1
+            pts = all_points[point_idx:point_idx + n_pts]
+            point_idx += n_pts
+            glyph["paths"].append(pts)
+
+    # Build lookup dict
+    font = {}
+    for g in glyphs:
+        font[g["codepoint"]] = g
+    return font
+
+
 class PicoVector:
     """Vector graphics renderer using PicoGraphics."""
 
@@ -291,12 +368,13 @@ class PicoVector:
         self._transform = Transform()
         self._antialiasing = ANTIALIAS_NONE
 
-        # Font settings
+        # Font settings (upstream defaults from pico_vector.hpp)
         self._font_file = None
-        self._font_size = 16
-        self._font_word_spacing = 4
-        self._font_letter_spacing = 1
-        self._font_line_height = 1.2
+        self._af_font = None
+        self._font_size = 48
+        self._font_word_spacing = 200  # percentage
+        self._font_letter_spacing = 95  # percentage
+        self._font_line_height = 110  # percentage
         self._font_align = 0  # 0=left, 1=center, 2=right
 
         state = get_state()
@@ -380,9 +458,35 @@ class PicoVector:
         if size is not None:
             self._font_size = size
 
+        # Try to load .af font file
+        self._af_font = None
+        if filename.endswith(".af"):
+            search_paths = []
+            if sys.path:
+                search_paths.append(sys.path[0])
+            search_paths.append(os.getcwd())
+            state = get_state()
+            app_path = state.get("app_path")
+            if app_path:
+                search_paths.append(os.path.dirname(os.path.abspath(app_path)))
+
+            for base in search_paths:
+                candidate = os.path.join(base, filename)
+                font = _load_af_font(candidate)
+                if font is not None:
+                    self._af_font = font
+                    break
+
+            # Also try absolute path
+            if self._af_font is None:
+                self._af_font = _load_af_font(filename)
+
         state = get_state()
         if state.get("trace"):
-            print(f"[PicoVector] set_font({filename}, {size})")
+            loaded = "loaded" if self._af_font else "not found"
+            print(f"[PicoVector] set_font({filename}, {size}) - {loaded}")
+
+        return self._af_font is not None
 
     def set_font_size(self, size: float):
         """Set font size."""
@@ -404,37 +508,125 @@ class PicoVector:
         """Set text alignment (0=left, 1=center, 2=right)."""
         self._font_align = align
 
+    def _get_line_width(self, line: str) -> float:
+        """Compute line width in glyph coordinate space (pre-scale)."""
+        width = 0.0
+        for ch in line:
+            cp = ord(ch)
+            glyph = self._af_font.get(cp)
+            if not glyph:
+                continue
+            if ch == ' ':
+                width += (glyph["advance"] * self._font_word_spacing) / 100.0
+            else:
+                width += (glyph["advance"] * self._font_letter_spacing) / 100.0
+        return width
+
     def measure_text(self, text: str, x: float = 0, y: float = 0,
                      angle: float = None) -> Tuple[float, float, float, float]:
-        """Measure text dimensions.
+        """Measure text dimensions. Returns (x, y, width, height)."""
+        if not self._af_font:
+            char_width = self._font_size * 0.6
+            char_height = self._font_size
+            lines = text.split('\n')
+            max_width = max(len(line) for line in lines) * (char_width + self._font_letter_spacing)
+            total_height = len(lines) * char_height * (self._font_line_height / 100.0)
+            return (x, y, max_width, total_height)
 
-        Returns (x, y, width, height).
-        """
-        # Simple estimation based on font size
-        char_width = self._font_size * 0.6
-        char_height = self._font_size
+        scale = self._font_size / 128.0
+        line_height = (self._font_line_height * 128.0) / 100.0
 
         lines = text.split('\n')
-        max_width = max(len(line) for line in lines) * (char_width + self._font_letter_spacing)
-        total_height = len(lines) * char_height * self._font_line_height
+        max_w = 0.0
+        for line in lines:
+            w = self._get_line_width(line)
+            if w > max_w:
+                max_w = w
 
-        return (x, y, max_width, total_height)
+        total_w = max_w * scale
+        total_h = len(lines) * line_height * scale
+
+        return (x, y, total_w, total_h)
 
     def text(self, text: str, x: float, y: float, angle: float = None,
              max_width: float = 0, max_height: float = 0):
-        """Draw text at position.
+        """Draw text at position using .af font glyphs or bitmap fallback."""
+        if not self._af_font:
+            # Bitmap fallback
+            tx, ty = self._transform.apply(x, y)
+            scale = self._font_size / 8
+            self._display.text(text, int(tx), int(ty), scale=scale)
+            return
 
-        Note: In the emulator, this falls back to PicoGraphics text rendering
-        since we don't have .af font file parsing.
-        """
-        # Apply transform
-        tx, ty = self._transform.apply(x, y)
+        scale = self._font_size / 128.0
+        line_height_glyph = (self._font_line_height * 128.0) / 100.0
 
-        # Calculate scale from font size (bitmap8 is 8px tall)
-        scale = self._font_size / 8
+        # Build per-text transform: identity -> rotate(angle) -> translate(x, y)
+        text_transform = Transform()
+        if angle is not None:
+            text_transform.rotate(angle)
+        text_transform.translate(x, y)
 
-        # Use PicoGraphics text rendering
-        self._display.text(text, int(tx), int(ty), scale=scale)
+        lines = text.split('\n')
+
+        # Compute max line width for alignment (matching upstream)
+        max_line_w = 0.0
+        if max_width > 0:
+            max_line_w = max_width / scale
+        else:
+            for line in lines:
+                w = self._get_line_width(line)
+                if w > max_line_w:
+                    max_line_w = w
+
+        max_h = max_height / scale if max_height > 0 else float('inf')
+
+        caret_y = 0.0
+        for line in lines:
+            if caret_y + line_height_glyph > max_h:
+                break
+            line_width = self._get_line_width(line)
+            caret_x = 0.0
+
+            for ch in line:
+                cp = ord(ch)
+                glyph = self._af_font.get(cp)
+                if not glyph:
+                    continue
+
+                # Build caret transform matching upstream:
+                # caret_transform = text_transform * scale(s,s) * translate(cx, cy + align_offset)
+                caret = Transform()
+                caret._matrix = list(text_transform._matrix)
+                caret.scale(scale, scale)
+                caret.translate(caret_x, caret_y)
+
+                # Alignment offset (in glyph coordinate space)
+                if self._font_align == 1:  # center
+                    caret.translate((max_line_w - line_width) / 2, 0)
+                elif self._font_align == 2:  # right
+                    caret.translate(max_line_w - line_width, 0)
+
+                # Compose with the global set_transform
+                final = Transform()
+                final._matrix = list(self._transform._matrix)
+                final._multiply(caret._matrix)
+
+                # Render each path in the glyph
+                for path_points in glyph["paths"]:
+                    if len(path_points) < 3:
+                        continue
+                    transformed = [final.apply(px, py) for px, py in path_points]
+                    int_points = [(int(px), int(py)) for px, py in transformed]
+                    self._fill_polygon(int_points)
+
+                # Advance caret
+                if ch == ' ':
+                    caret_x += (glyph["advance"] * self._font_word_spacing) / 100.0
+                else:
+                    caret_x += (glyph["advance"] * self._font_letter_spacing) / 100.0
+
+            caret_y += line_height_glyph
 
         state = get_state()
         if state.get("trace"):
