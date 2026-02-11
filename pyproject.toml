@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pimoroni-emulator"
-version = "0.1.0"
+version = "0.2.0"
 description = "Desktop emulator for Pimoroni devices (Tufty, Presto, Badger, Blinky, Inky)"
 readme = "README.md"
 requires-python = ">=3.10"
