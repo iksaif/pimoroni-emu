@@ -67,6 +67,9 @@ pimoroni-emulator --device badger apps/badger/hello_badge.py
 pimoroni-emulator --device inky_frame apps/inky_frame/hello_inky.py
 pimoroni-emulator --device inky_impression apps/inky_impression/hello_impression.py
 
+# Run Blinky apps (auto-detected from path)
+pimoroni-emulator apps/blinky/snake.py
+
 # Device is auto-detected from app path
 pimoroni-emulator apps/tufty/hello_badge.py
 
@@ -93,6 +96,14 @@ pimoroni-emulator --device tufty --scale 3 app.py
 - **Up / Down** - UP/DOWN buttons (Tufty, Badger)
 - **Mouse click** - Touch input (Presto)
 
+#### QwSTPad gamepad (Presto, Blinky)
+
+When an app creates a QwSTPad instance, a clickable gamepad widget appears below the display:
+
+- **Arrow keys** - D-pad (U/D/L/R)
+- **Z / X / C / V** - Face buttons (A/B/X/Y)
+- **= / -** - Plus/Minus buttons
+
 ## Compatibility matrix
 
 ### Devices
@@ -100,7 +111,7 @@ pimoroni-emulator --device tufty --scale 3 app.py
 | Family | Device | Display | Resolution | Library | Status |
 |--------|--------|---------|------------|---------|--------|
 | **Tufty** | Tufty 2350 | TFT IPS | 320x240 | PicoGraphics | Working |
-| **Blinky** | Blinky 2350 | LED matrix | 39x26 | Badgeware | Partial |
+| **Blinky** | Blinky 2350 | LED matrix | 39x26 | Badgeware | Working |
 | **Presto** | Presto | TFT IPS touch | 480x480 | PicoGraphics | Working |
 | **Badger** | Badger 2350 | E-ink mono | 296x128 | PicoGraphics | Working |
 | **Inky Frame** | 7.3" | E-ink 6-color | 800x480 | PicoGraphics | Working |
@@ -126,7 +137,8 @@ pimoroni-emulator --device tufty --scale 3 app.py
 | `network` / `socket` | Good | WiFi connect, sockets pass through to host |
 | `jpegdec` / `pngdec` | Good | Decode via Pillow, render to framebuffer |
 | `picovector` | Good | Vectors, polygons, .af fonts, SVG loading |
-| Sensors | Stubs | BME280, LTR559, LSM6DS3, QwSTPad |
+| `qwstpad` | Good | Gamepad input via keyboard/mouse, LED indicators |
+| Sensors | Stubs | BME280, LTR559, LSM6DS3 |
 
 ## Not yet working
 
