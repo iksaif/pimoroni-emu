@@ -63,6 +63,11 @@ class Pin:
 
     def value(self, x: Optional[int] = None) -> Optional[int]:
         if x is None:
+            # VBUS_DETECT (pin 24): read USB power state from battery mock
+            if self.id == 24:
+                battery = get_state().get("battery")
+                if battery:
+                    return 1 if battery._usb_connected else 0
             return self._value
         self._value = 1 if x else 0
         return None
@@ -353,18 +358,24 @@ class ADC:
             # reading = 0.71374 / 3.3 * 65535 = 14177
             return 14177
 
-        # VBAT_SENSE (pin 26): read from battery mock if available
         pin_id = self._channel or (self._pin.id if self._pin else None)
-        if pin_id == 26:
-            battery = get_state().get("battery")
-            if battery:
-                # Battery voltage through 2:1 divider
-                # ADC sees voltage/2, reading = (voltage/2) / 3.3 * 65535
-                return int((battery._voltage / 2) / 3.3 * 65535)
+        battery = get_state().get("battery")
+
+        # VBAT_SENSE (pin 26): battery through 2:1 external divider
+        if pin_id == 26 and battery:
+            # ADC sees voltage/2, reading = (voltage/2) / 3.3 * 65535
+            return int((battery._voltage / 2) / 3.3 * 65535)
 
         # SENSE_1V1 (pin 27): internal 1.1V reference
         if pin_id == 27:
             return int(1.1 / 3.3 * 65535)
+
+        # VSYS (pin 29): system input voltage through internal 3:1 divider
+        # On Pico W / Inky Frame, apps read ADC(Pin(29)) to get battery voltage.
+        # The RP2040/RP2350 has an internal 3:1 divider on this pin.
+        # Voltage = reading * 3.3 / 65535 * 3
+        if pin_id == 29 and battery:
+            return int((battery._voltage / 3) / 3.3 * 65535)
 
         return self._value
 
