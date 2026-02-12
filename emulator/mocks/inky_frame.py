@@ -7,6 +7,16 @@ The inky_frame module is baked into Pimoroni's MicroPython firmware.
 from typing import Optional, Callable
 from emulator import get_state
 
+# Pen colour indices (matching upstream C++ enum)
+BLACK = 0
+WHITE = 1
+GREEN = 2
+BLUE = 3
+RED = 4
+YELLOW = 5
+ORANGE = 6
+TAUPE = 7
+
 
 class LED:
     """White LED control (PWM capable)."""
@@ -164,27 +174,64 @@ def woken_by_ext_trigger() -> bool:
     return False
 
 
+def pcf_to_pico_rtc() -> bool:
+    """Sync PCF85063A RTC time to Pico's RTC. No-op in emulator."""
+    return True
+
+
+def pico_rtc_to_pcf():
+    """Sync Pico's RTC time to PCF85063A. No-op in emulator."""
+    pass
+
+
+def set_time():
+    """Sync RTC from network time. No-op in emulator (host clock is used)."""
+    pass
+
+
+class _DeviceSleepError(SystemExit):
+    """Raised to halt the app thread when the device turns off."""
+    pass
+
+
 def sleep_for(minutes: int):
     """Put device into deep sleep for specified minutes.
 
-    In emulator, this just pauses execution briefly.
+    On real hardware this powers down and wakes via RTC alarm.
+    In the emulator we show a countdown timer in the status bar,
+    wait the duration (sleeping the thread), then return so the
+    app continues as if the device woke up normally.
     """
-    import time
+    import time as _time
     state = get_state()
-    if state.get("trace"):
-        print(f"[inky_frame] sleep_for({minutes} minutes) - simulating brief pause")
-    time.sleep(0.1)  # Brief pause in emulator
+    end = _time.time() + minutes * 60
+    print(f"[inky_frame] sleep_for({minutes} minutes) - sleeping with countdown")
+
+    while state.get("running", True):
+        remaining = int(end - _time.time())
+        if remaining <= 0:
+            break
+        rm, rs = divmod(remaining, 60)
+        rh, rm = divmod(rm, 60)
+        if rh > 0:
+            state["device_status"] = f"Sleeping ({rh}h{rm:02d}m{rs:02d}s)"
+        else:
+            state["device_status"] = f"Sleeping ({rm}m{rs:02d}s)"
+        _time.sleep(1)
+
+    state.pop("device_status", None)
+    print("[inky_frame] Woke up from sleep")
 
 
 def turn_off():
     """Turn off the device completely.
 
-    In emulator, this stops the running app.
+    In emulator, stops the app but keeps the window open for e-ink.
     """
     state = get_state()
-    if state.get("trace"):
-        print("[inky_frame] turn_off() called - stopping emulator")
-    state["running"] = False
+    state["device_status"] = "Powered off"
+    print("[inky_frame] turn_off() - halting app, window stays open")
+    raise _DeviceSleepError(0)
 
 
 # RTC functions

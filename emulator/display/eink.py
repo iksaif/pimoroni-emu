@@ -16,26 +16,31 @@ def _init_pygame():
         pygame = pg
 
 
-# Color e-ink palettes
+# Color e-ink palettes (pen index order matches upstream C++ enum:
+# BLACK=0, WHITE=1, GREEN=2, BLUE=3, RED=4, YELLOW=5, ORANGE=6, TAUPE/CLEAN=7)
+
 # Spectra 6 colors (Inky Frame 7.3")
 SPECTRA_6_PALETTE = [
-    (0, 0, 0),        # Black
-    (255, 255, 255),  # White
-    (0, 128, 0),      # Green
-    (0, 0, 255),      # Blue
-    (255, 0, 0),      # Red
-    (255, 255, 0),    # Yellow
+    (0, 0, 0),        # 0 Black
+    (255, 255, 255),  # 1 White
+    (0, 128, 0),      # 2 Green
+    (0, 0, 255),      # 3 Blue
+    (255, 0, 0),      # 4 Red
+    (255, 255, 0),    # 5 Yellow
+    (255, 128, 0),    # 6 Orange
+    (180, 160, 140),  # 7 Taupe / Clean
 ]
 
 # ACeP 7 colors (Inky Frame 4.0", 5.8")
 ACEP_7_PALETTE = [
-    (0, 0, 0),        # Black
-    (255, 255, 255),  # White
-    (0, 128, 0),      # Green
-    (0, 0, 255),      # Blue
-    (255, 0, 0),      # Red
-    (255, 255, 0),    # Yellow
-    (255, 128, 0),    # Orange
+    (0, 0, 0),        # 0 Black
+    (255, 255, 255),  # 1 White
+    (0, 128, 0),      # 2 Green
+    (0, 0, 255),      # 3 Blue
+    (255, 0, 0),      # 4 Red
+    (255, 255, 0),    # 5 Yellow
+    (255, 128, 0),    # 6 Orange
+    (180, 160, 140),  # 7 Taupe / Clean
 ]
 
 
@@ -122,6 +127,9 @@ class EInkDisplay(BaseDisplay):
                     r = (color >> 16) & 0xFF
                     g = (color >> 8) & 0xFF
                     b = color & 0xFF
+                elif self._is_color and color < len(self._palette):
+                    # Pen index → direct palette lookup for color e-ink
+                    r, g, b = self._palette[color]
                 else:
                     # Pen index (0-15 for e-ink grayscale)
                     r = g = b = int(color * 255 / 15) if color <= 15 else color
@@ -129,9 +137,9 @@ class EInkDisplay(BaseDisplay):
                 if self._is_color:
                     pixel_color = _find_nearest_color(r, g, b, self._palette)
                     pixel_color = (
-                        min(255, pixel_color[0] - 10 if pixel_color[0] > 10 else pixel_color[0]),
-                        min(255, pixel_color[1] - 10 if pixel_color[1] > 10 else pixel_color[1]),
-                        min(255, pixel_color[2] - 5 if pixel_color[2] > 5 else pixel_color[2])
+                        max(0, pixel_color[0] - 10),
+                        max(0, pixel_color[1] - 10),
+                        max(0, pixel_color[2] - 5)
                     )
                 else:
                     gray = int(0.299 * r + 0.587 * g + 0.114 * b)
@@ -265,13 +273,16 @@ class EInkDisplay(BaseDisplay):
         text = font.render(f"{self.device.name}", True, (60, 60, 60))
         self._window.blit(text, (10, 10))
 
-        # Refresh indicator
-        if self._refresh_animation:
+        # Device status or refresh indicator
+        device_status = get_state().get("device_status")
+        if device_status:
+            text = font.render(device_status, True, (180, 140, 50))
+        elif self._refresh_animation:
             text = font.render("REFRESHING", True, (200, 100, 100))
         else:
             text = font.render(f"Frame: {self._frame_count}", True, (100, 100, 100))
         win_w = self.device.get_window_size()[0]
-        self._window.blit(text, (win_w - 120, 10))
+        self._window.blit(text, (win_w - text.get_width() - 10, 10))
 
         # Memory bar
         mem = self._get_memory_info()
@@ -351,6 +362,14 @@ class EInkDisplay(BaseDisplay):
             font_sm = pygame.font.SysFont("monospace", 10)
             label = font_sm.render("BUSY", True, (120, 120, 120))
             self._window.blit(label, (win_w - 42, win_h - 34))
+
+    def tick(self):
+        """Redraw if device status changed (sleep/reset/off)."""
+        status = get_state().get("device_status")
+        if status and status != getattr(self, '_last_status', None):
+            self._last_status = status
+            if self._display_surface:
+                self._draw_window()
 
     def refresh_ui(self):
         """Redraw window to update UI elements (buttons) without a new render."""
@@ -433,6 +452,9 @@ class EInkDisplay(BaseDisplay):
                     r = (color >> 16) & 0xFF
                     g = (color >> 8) & 0xFF
                     b = color & 0xFF
+                elif self._is_color and color < len(self._palette):
+                    # Pen index → direct palette lookup for color e-ink
+                    r, g, b = self._palette[color]
                 else:
                     # Pen index (0-15 for e-ink grayscale)
                     # Convert to grayscale: 0=black, 15=white

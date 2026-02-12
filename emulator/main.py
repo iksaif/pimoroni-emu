@@ -300,22 +300,32 @@ def run_app_headless(app_path: Path, max_frames: int = 0):
 
     state = get_state()
 
-    # Run app in separate thread
+    # Run app in separate thread (loops on machine.reset())
     def app_thread():
-        try:
-            # Add app directory to path
-            app_dir = str(app_path.parent.absolute())
-            if app_dir not in sys.path:
-                sys.path.insert(0, app_dir)
+        from emulator.mocks.machine import _MachineResetError
+        while state["running"]:
+            try:
+                # Add app directory to path
+                app_dir = str(app_path.parent.absolute())
+                if app_dir not in sys.path:
+                    sys.path.insert(0, app_dir)
 
-            # Run the app
-            runpy.run_path(str(app_path), run_name="__main__")
-        except Exception as e:
-            print(f"App error: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            state["running"] = False
+                # Run the app
+                runpy.run_path(str(app_path), run_name="__main__")
+                break  # App exited normally
+            except _MachineResetError:
+                print("[emulator] Rebooting app...")
+                state.pop("device_status", None)
+                continue
+            except SystemExit:
+                break  # Device sleep/turn_off
+            except Exception as e:
+                print(f"App error: {e}")
+                import traceback
+                traceback.print_exc()
+                break
+
+        state["running"] = False
 
     thread = threading.Thread(target=app_thread, daemon=True)
     thread.start()
@@ -359,26 +369,37 @@ def run_app_interactive(
 
     state = get_state()
 
-    # Run app in separate thread
+    # Run app in separate thread (loops on machine.reset())
     def app_thread():
-        try:
-            # Add app directory to path
-            app_dir = str(app_path.parent.absolute())
-            if app_dir not in sys.path:
-                sys.path.insert(0, app_dir)
+        from emulator.mocks.machine import _MachineResetError
+        while state["running"]:
+            try:
+                # Add app directory to path
+                app_dir = str(app_path.parent.absolute())
+                if app_dir not in sys.path:
+                    sys.path.insert(0, app_dir)
 
-            # Run the app
-            runpy.run_path(str(app_path), run_name="__main__")
-        except Exception as e:
-            if state["running"]:  # Only print if not intentionally stopped
-                print(f"App error: {e}")
-                import traceback
-                traceback.print_exc()
-        finally:
-            # E-ink displays retain their image, so keep the window open
-            device_obj = state.get("device")
-            if not (device_obj and getattr(device_obj, "is_eink", False)):
-                state["running"] = False
+                # Run the app
+                runpy.run_path(str(app_path), run_name="__main__")
+                break  # App exited normally
+            except _MachineResetError:
+                # Simulated reboot — clear status and re-run the script
+                print("[emulator] Rebooting app...")
+                state.pop("device_status", None)
+                continue
+            except SystemExit:
+                break  # Device sleep/turn_off — stop the loop
+            except Exception as e:
+                if state["running"]:  # Only print if not intentionally stopped
+                    print(f"App error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                break
+
+        # E-ink displays retain their image, so keep the window open
+        device_obj = state.get("device")
+        if not (device_obj and getattr(device_obj, "is_eink", False)):
+            state["running"] = False
 
     thread = threading.Thread(target=app_thread, daemon=True)
     thread.start()

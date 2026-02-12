@@ -130,6 +130,44 @@ BITMAP6_DATA = [
 ]
 
 
+
+
+# Unicode → ASCII transliteration for characters outside bitmap font range.
+# The upstream Pimoroni firmware fonts only cover ASCII 32-126, so on real
+# hardware these characters would not render either.  We transliterate to
+# the closest ASCII equivalent so text stays readable in the emulator.
+_UNICODE_TO_ASCII = {
+    # Latin-1 Supplement accented vowels
+    0xC0: 'A', 0xC1: 'A', 0xC2: 'A', 0xC3: 'A', 0xC4: 'A', 0xC5: 'A',  # À-Å
+    0xC6: 'A',  # Æ
+    0xC7: 'C',  # Ç
+    0xC8: 'E', 0xC9: 'E', 0xCA: 'E', 0xCB: 'E',  # È-Ë
+    0xCC: 'I', 0xCD: 'I', 0xCE: 'I', 0xCF: 'I',  # Ì-Ï
+    0xD0: 'D',  # Ð
+    0xD1: 'N',  # Ñ
+    0xD2: 'O', 0xD3: 'O', 0xD4: 'O', 0xD5: 'O', 0xD6: 'O', 0xD8: 'O',  # Ò-Ö, Ø
+    0xD9: 'U', 0xDA: 'U', 0xDB: 'U', 0xDC: 'U',  # Ù-Ü
+    0xDD: 'Y',  # Ý
+    0xDF: 's',  # ß → ss would change width, just use s
+    0xE0: 'a', 0xE1: 'a', 0xE2: 'a', 0xE3: 'a', 0xE4: 'a', 0xE5: 'a',  # à-å
+    0xE6: 'a',  # æ
+    0xE7: 'c',  # ç
+    0xE8: 'e', 0xE9: 'e', 0xEA: 'e', 0xEB: 'e',  # è-ë
+    0xEC: 'i', 0xED: 'i', 0xEE: 'i', 0xEF: 'i',  # ì-ï
+    0xF0: 'o',  # ð
+    0xF1: 'n',  # ñ
+    0xF2: 'o', 0xF3: 'o', 0xF4: 'o', 0xF5: 'o', 0xF6: 'o', 0xF8: 'o',  # ò-ö, ø
+    0xF9: 'u', 0xFA: 'u', 0xFB: 'u', 0xFC: 'u',  # ù-ü
+    0xFD: 'y', 0xFF: 'y',  # ý, ÿ
+    # Common punctuation / symbols
+    0x2018: "'", 0x2019: "'",  # ' '
+    0x201C: '"', 0x201D: '"',  # " "
+    0x2013: '-', 0x2014: '-',  # – —
+    0x2026: '.',  # …
+    0x0152: 'O', 0x0153: 'o',  # Œ, œ
+}
+
+
 class BitmapFont:
     """Pimoroni-compatible bitmap font."""
 
@@ -150,6 +188,10 @@ class BitmapFont:
         """
         code = ord(char)
         if code < self.first_char or code >= self.first_char + len(self.widths):
+            # Try transliterating accented/extended characters to ASCII
+            ascii_char = _UNICODE_TO_ASCII.get(code)
+            if ascii_char:
+                return self.get_char_data(ascii_char)
             # Return space for unknown characters
             return ([0] * self.max_width, self.widths[0])
 

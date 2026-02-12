@@ -22,6 +22,7 @@ daylight = _time.daylight
 tzname = _time.tzname
 clock_gettime = getattr(_time, 'clock_gettime', None)
 clock_gettime_ns = getattr(_time, 'clock_gettime_ns', None)
+get_clock_info = _time.get_clock_info
 CLOCK_MONOTONIC = getattr(_time, 'CLOCK_MONOTONIC', None)
 CLOCK_REALTIME = getattr(_time, 'CLOCK_REALTIME', None)
 

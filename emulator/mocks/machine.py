@@ -418,14 +418,24 @@ class mem32:
 mem32 = mem32()
 
 
+class _MachineResetError(SystemExit):
+    """Raised to signal the emulator to restart the app (simulates reboot)."""
+    pass
+
+
 def reset():
-    """Reset the device."""
-    print("[machine] Reset requested")
+    """Reset the device.
+
+    In emulator, restarts the app script (simulates a reboot).
+    """
+    print("[machine] Reset requested - restarting app")
+    raise _MachineResetError(0)
 
 
 def soft_reset():
     """Soft reset the device."""
-    print("[machine] Soft reset requested")
+    print("[machine] Soft reset requested - restarting app")
+    raise _MachineResetError(0)
 
 
 def reset_cause() -> int:

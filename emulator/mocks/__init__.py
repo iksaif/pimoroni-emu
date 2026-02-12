@@ -109,6 +109,26 @@ def teardown_vfs():
     builtins.open = _original_open
 
 
+def _patch_os_uname():
+    """Patch os.uname() to return MicroPython-like values.
+
+    Apps check os.uname().sysname == "rp2" to detect MicroPython on RP2.
+    We can't replace the os module, so we monkey-patch uname.
+    """
+    import os
+    from collections import namedtuple
+    _uname_result = namedtuple("uname_result",
+                               ["sysname", "nodename", "release", "version", "machine"])
+    _fake_uname = _uname_result(
+        sysname="rp2",
+        nodename="rp2",
+        release="1.24.1",
+        version="MicroPython v1.24.1 (emulator)",
+        machine="Raspberry Pi Pico 2 W with RP2350",
+    )
+    os.uname = lambda: _fake_uname
+
+
 def install_mocks():
     """Install all mock modules into sys.modules."""
     # Import base module (provides trace_log and base classes)
@@ -168,6 +188,7 @@ def install_mocks():
     # WiFi helpers
     from emulator.mocks import ezwifi
     from emulator.mocks import network_manager
+    from emulator.mocks import rp2
 
     # Core MicroPython modules
     sys.modules["machine"] = machine
@@ -175,6 +196,18 @@ def install_mocks():
     sys.modules["utime"] = mock_time  # MicroPython alias
     sys.modules["gc"] = mock_gc
     sys.modules["micropython"] = mock_micropython
+
+    # MicroPython asyncio alias (wrapper that auto-creates event loops in threads)
+    from emulator.mocks import uasyncio
+    sys.modules["uasyncio"] = uasyncio
+    sys.modules["rp2"] = rp2
+
+    # MicroPython stdlib aliases
+    import json as _json
+    sys.modules["ujson"] = _json
+
+    # Patch os.uname() to report as MicroPython on RP2
+    _patch_os_uname()
 
     # Pimoroni libraries
     sys.modules["picographics"] = picographics
@@ -277,6 +310,7 @@ def install_badgeware_mocks():
     from emulator.mocks import breakout_bme280
     from emulator.mocks import easing
     from emulator.mocks import urequests
+    from emulator.mocks import rp2
 
     # Core MicroPython modules
     sys.modules["machine"] = machine
@@ -286,6 +320,18 @@ def install_badgeware_mocks():
     sys.modules["micropython"] = mock_micropython
     sys.modules["network"] = network
     sys.modules["usocket"] = mock_socket
+
+    # MicroPython asyncio alias (wrapper that auto-creates event loops in threads)
+    from emulator.mocks import uasyncio
+    sys.modules["uasyncio"] = uasyncio
+    sys.modules["rp2"] = rp2
+
+    # MicroPython stdlib aliases
+    import json as _json
+    sys.modules["ujson"] = _json
+
+    # Patch os.uname() to report as MicroPython on RP2
+    _patch_os_uname()
 
     # Blinky-specific modules
     sys.modules["blinky"] = blinky
@@ -317,7 +363,7 @@ def install_badgeware_mocks():
 def uninstall_mocks():
     """Remove mock modules from sys.modules."""
     mock_names = [
-        "machine", "time", "utime", "gc", "micropython",
+        "machine", "time", "utime", "uasyncio", "rp2", "gc", "micropython",
         "picographics", "pimoroni", "network", "usocket",
         "jpegdec", "presto", "tufty2350", "touch", "inky_frame", "picovector",
         "badger2040", "badger_os", "pngdec", "uos", "ntptime", "sdcard", "urequests",
