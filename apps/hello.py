@@ -24,7 +24,7 @@ if library_type == 'inky':
 
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 48)
-    except:
+    except Exception:
         font = ImageFont.load_default()
 
     text = f"Hello {device_name}!"
@@ -96,5 +96,6 @@ print(f"Hello app running on {device_name}!")
 
 # Keep running (like a real badge app)
 import time
+
 while True:
     time.sleep(0.1)

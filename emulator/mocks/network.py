@@ -1,8 +1,8 @@
 """Mock implementation of MicroPython's network module."""
 
 from typing import Optional, Tuple
-from emulator import get_state
 
+from emulator import get_state
 
 # Interface types
 STA_IF = 0

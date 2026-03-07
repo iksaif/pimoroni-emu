@@ -1,9 +1,10 @@
 """TFT display renderer using pygame."""
 
 import threading
-from typing import List, Tuple
-from emulator.display.base import BaseDisplay, draw_memory_bar
+from typing import List
+
 from emulator import get_state
+from emulator.display.base import BaseDisplay, draw_memory_bar
 
 # Lazy import pygame to allow headless operation
 pygame = None
@@ -371,7 +372,6 @@ class TFTDisplay(BaseDisplay):
         from emulator.mocks.qwstpad import KEY_TO_BUTTON
 
         font = pygame.font.SysFont("monospace", 13, bold=True)
-        small_font = pygame.font.SysFont("monospace", 10)
 
         for key_name, rect, label in layout:
             x, y, w, h = rect

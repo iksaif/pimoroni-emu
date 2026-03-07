@@ -1,7 +1,8 @@
 """Touch demo for Presto."""
 
-from presto import Presto
 import time
+
+from presto import Presto
 
 # Initialize Presto
 presto = Presto()

@@ -1,8 +1,9 @@
 """Scrolling text for Blinky 2350 LED matrix."""
 
-from picographics import PicoGraphics, DISPLAY_BLINKY
-from pimoroni import Button
 import time
+
+from picographics import DISPLAY_BLINKY, PicoGraphics
+from pimoroni import Button
 
 # Set up display (LED matrix)
 display = PicoGraphics(display=DISPLAY_BLINKY)

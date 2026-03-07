@@ -3,11 +3,10 @@
 This is the core display API used by all Pimoroni devices.
 """
 
-from typing import Optional, Tuple, List
-import math
-from emulator import get_state, get_display
-from emulator.mocks.fonts import get_font, BitmapFont
+from typing import List, Optional, Tuple
 
+from emulator import get_display, get_state
+from emulator.mocks.fonts import BitmapFont, get_font
 
 # Display types
 DISPLAY_TUFTY_2350 = 0

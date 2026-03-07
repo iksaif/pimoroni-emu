@@ -37,7 +37,7 @@ class NetworkManager:
 
     async def client(self, ssid, psk="", timeout=30):
         """Connect as WiFi client."""
-        from emulator.mocks.network import WLAN, STA_IF
+        from emulator.mocks.network import STA_IF, WLAN
         wlan = WLAN(STA_IF)
         wlan.active(True)
         wlan.connect(ssid, psk)

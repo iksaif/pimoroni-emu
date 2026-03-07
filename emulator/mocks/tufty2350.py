@@ -1,8 +1,7 @@
 """Mock implementation of Tufty 2350 device module."""
 
 from emulator import get_state
-from emulator.mocks.picographics import PicoGraphics, DISPLAY_TUFTY_2350, PEN_RGB565
-
+from emulator.mocks.picographics import DISPLAY_TUFTY_2350, PEN_RGB565, PicoGraphics
 
 # Button pin definitions (matching real hardware)
 BUTTON_A = 7

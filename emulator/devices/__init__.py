@@ -1,22 +1,21 @@
 """Device configurations for Pimoroni emulator."""
 
-from emulator.devices.base import BaseDevice
-from emulator.devices.tufty2350 import Tufty2350Device
-from emulator.devices.blinky2350 import Blinky2350Device
-from emulator.devices.presto import PrestoDevice
 from emulator.devices.badger2350 import Badger2350Device
+from emulator.devices.base import BaseDevice
+from emulator.devices.blinky2350 import Blinky2350Device
 from emulator.devices.inky_frame import (
-    InkyFrame73Device,
-    InkyFrame58Device,
     InkyFrame40Device,
+    InkyFrame58Device,
+    InkyFrame73Device,
 )
 from emulator.devices.inky_impression import (
-    InkyImpression73Device,
-    InkyImpression57Device,
     InkyImpression40Device,
+    InkyImpression57Device,
+    InkyImpression73Device,
     InkyImpression133Device,
 )
-
+from emulator.devices.presto import PrestoDevice
+from emulator.devices.tufty2350 import Tufty2350Device
 
 DEVICES = {
     "tufty": Tufty2350Device,

@@ -50,5 +50,15 @@ pimoroni-emulator = "emulator.main:main"
 include = ["emulator*"]
 exclude = ["vendor*", "tests*", "apps*"]
 
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+# apps/: MicroPython scripts have late imports (E402), badgeware builtins (F821)
+# emulator/testing/__init__.py: re-exports for public API (F401)
+per-file-ignores = {"apps/**" = ["E402", "F821"], "emulator/testing/__init__.py" = ["F401"], "emulator/mocks/**" = ["E402"]}
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

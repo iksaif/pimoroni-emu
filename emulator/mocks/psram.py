@@ -1,6 +1,6 @@
 """Mock implementation of PSRAM (Pseudo-Static RAM) module."""
 
-from emulator import get_state, get_device
+from emulator import get_device, get_state
 
 # Default PSRAM size (8MB as per RP2350 devices)
 PSRAM_SIZE = 8 * 1024 * 1024

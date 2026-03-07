@@ -4,6 +4,7 @@ Provides touch button functionality and touch controller emulation.
 """
 
 from typing import List, Tuple
+
 from emulator import get_state
 from emulator.mocks.base import trace_log
 

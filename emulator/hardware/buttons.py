@@ -1,8 +1,9 @@
 """Button input simulation."""
 
-from typing import Dict, Optional, Set
+from typing import Optional, Set
+
 from emulator import get_state
-from emulator.devices.base import BaseDevice, ButtonConfig
+from emulator.devices.base import BaseDevice
 
 
 class ButtonManager:

@@ -1,6 +1,7 @@
 """Mock for InkyAC073TC1A (Spectra 6-color 7.3") displays."""
 
-from typing import Tuple, List, Any
+from typing import Any, List, Tuple
+
 from emulator.mocks.inky.inky import Inky
 
 try:

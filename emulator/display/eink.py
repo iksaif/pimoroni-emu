@@ -1,9 +1,10 @@
 """E-ink display renderer for Badger 2350 and Inky Frame."""
 
-from typing import List, Optional, Tuple
 import time as _time
-from emulator.display.base import BaseDisplay, draw_memory_bar
+from typing import List, Tuple
+
 from emulator import get_state
+from emulator.display.base import BaseDisplay, draw_memory_bar
 
 # Lazy import pygame
 pygame = None

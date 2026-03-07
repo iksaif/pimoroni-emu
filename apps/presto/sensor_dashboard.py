@@ -4,8 +4,9 @@ Instantiates every sensor mock and displays live readings.
 Use the emulator sensor panel sliders to change values.
 """
 
-from presto import Presto, Buzzer
 import time
+
+from presto import Buzzer, Presto
 
 # Initialize Presto
 presto = Presto()
@@ -14,56 +15,72 @@ WIDTH, HEIGHT = display.get_bounds()
 
 # Initialize I2C bus
 from machine import I2C, Pin
+
 i2c = I2C(0, sda=Pin(4), scl=Pin(5))
 
 # --- Initialize all sensors ---
 
 from breakout_bme280 import BreakoutBME280
+
 bme280 = BreakoutBME280(i2c)
 
 from breakout_bme68x import BreakoutBME68X
+
 bme68x = BreakoutBME68X(i2c, address=0x77)
 
 from breakout_bmp280 import BreakoutBMP280
+
 bmp280 = BreakoutBMP280(i2c)
 
 from breakout_ltr559 import BreakoutLTR559
+
 ltr559 = BreakoutLTR559(i2c)
 
 from lsm6ds3 import LSM6DS3
+
 imu = LSM6DS3(i2c)
 
 import breakout_scd41
+
 breakout_scd41.init(i2c)
 breakout_scd41.start()
 
 from breakout_sgp30 import BreakoutSGP30
+
 sgp30 = BreakoutSGP30(i2c)
 
 from breakout_rtc import BreakoutRTC
+
 rtc = BreakoutRTC(i2c)
 rtc.setup()
 
 from breakout_icp10125 import BreakoutICP10125
+
 icp = BreakoutICP10125(i2c)
 
 from breakout_bh1745 import BreakoutBH1745
+
 colour = BreakoutBH1745(i2c)
 
 from breakout_msa301 import BreakoutMSA301
+
 accel = BreakoutMSA301(i2c)
 
 from breakout_potentiometer import BreakoutPotentiometer
+
 pot = BreakoutPotentiometer(i2c)
 
 from breakout_encoder import BreakoutEncoder
+
 enc = BreakoutEncoder(i2c)
 
 from breakout_vl53l5cx import BreakoutVL53L5CX
+
 tof = BreakoutVL53L5CX(i2c)
 tof.start_ranging()
 
 from emulator import get_state
+
 battery = get_state().get("battery")
 
 # Buzzer

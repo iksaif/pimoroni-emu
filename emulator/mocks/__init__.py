@@ -4,11 +4,10 @@ This module injects mock implementations into sys.modules so that
 MicroPython imports work in the desktop emulator.
 """
 
-import sys
 import builtins
 import shutil
+import sys
 from pathlib import Path
-
 
 # Store original open function
 _original_open = builtins.open
@@ -132,63 +131,64 @@ def _patch_os_uname():
 def install_mocks():
     """Install all mock modules into sys.modules."""
     # Import base module (provides trace_log and base classes)
-    from emulator.mocks import base  # noqa: F401
-
     # Import mocks and register them
-    from emulator.mocks import machine
-    from emulator.mocks import time as mock_time
+    # Hardware sensor mocks
+    # Additional breakout sensor mocks
+    # WiFi helpers
+    from emulator.mocks import (
+        badger2040,
+        badger_os,
+        base,  # noqa: F401
+        breakout_as7262,
+        breakout_as7343,
+        breakout_bh1745,
+        breakout_bme68x,
+        breakout_bme280,
+        breakout_bmp280,
+        breakout_dotmatrix,
+        breakout_encoder,
+        breakout_encoder_wheel,
+        breakout_icp10125,
+        breakout_ioexpander,
+        breakout_ltr559,
+        breakout_matrix11x7,
+        breakout_mics6814,
+        breakout_mlx90640,
+        breakout_msa301,
+        breakout_pmw3901,
+        breakout_potentiometer,
+        breakout_rgbmatrix5x5,
+        breakout_rtc,
+        breakout_scd41,
+        breakout_sgp30,
+        breakout_trackball,
+        breakout_vl53l5cx,
+        ezwifi,
+        inky_frame,
+        jpegdec,
+        lsm6ds3,
+        machine,
+        network,
+        network_manager,
+        ntptime,
+        picographics,
+        picovector,
+        pimoroni,
+        pngdec,
+        presto,
+        psram,
+        qwstpad,
+        rp2,
+        sdcard,
+        touch,
+        tufty2350,
+        uos,
+        urequests,
+    )
     from emulator.mocks import gc as mock_gc
     from emulator.mocks import micropython as mock_micropython
-    from emulator.mocks import picographics
-    from emulator.mocks import pimoroni
-    from emulator.mocks import network
     from emulator.mocks import socket as mock_socket
-    from emulator.mocks import jpegdec
-    from emulator.mocks import presto
-    from emulator.mocks import tufty2350
-    from emulator.mocks import touch
-    from emulator.mocks import inky_frame
-    from emulator.mocks import picovector
-    from emulator.mocks import badger2040
-    from emulator.mocks import badger_os
-    from emulator.mocks import pngdec
-    from emulator.mocks import uos
-    from emulator.mocks import ntptime
-    from emulator.mocks import sdcard
-    from emulator.mocks import urequests
-    # Hardware sensor mocks
-    from emulator.mocks import breakout_bme280
-    from emulator.mocks import breakout_ltr559
-    from emulator.mocks import lsm6ds3
-    from emulator.mocks import qwstpad
-    from emulator.mocks import psram
-    # Additional breakout sensor mocks
-    from emulator.mocks import breakout_bme68x
-    from emulator.mocks import breakout_bmp280
-    from emulator.mocks import breakout_scd41
-    from emulator.mocks import breakout_sgp30
-    from emulator.mocks import breakout_rtc
-    from emulator.mocks import breakout_potentiometer
-    from emulator.mocks import breakout_encoder
-    from emulator.mocks import breakout_trackball
-    from emulator.mocks import breakout_msa301
-    from emulator.mocks import breakout_bh1745
-    from emulator.mocks import breakout_as7262
-    from emulator.mocks import breakout_as7343
-    from emulator.mocks import breakout_dotmatrix
-    from emulator.mocks import breakout_rgbmatrix5x5
-    from emulator.mocks import breakout_matrix11x7
-    from emulator.mocks import breakout_ioexpander
-    from emulator.mocks import breakout_encoder_wheel
-    from emulator.mocks import breakout_icp10125
-    from emulator.mocks import breakout_mics6814
-    from emulator.mocks import breakout_vl53l5cx
-    from emulator.mocks import breakout_pmw3901
-    from emulator.mocks import breakout_mlx90640
-    # WiFi helpers
-    from emulator.mocks import ezwifi
-    from emulator.mocks import network_manager
-    from emulator.mocks import rp2
+    from emulator.mocks import time as mock_time
 
     # Core MicroPython modules
     sys.modules["machine"] = machine
@@ -294,23 +294,25 @@ def install_badgeware_mocks():
 
     Also includes picographics for low-level examples that use both APIs.
     """
-    from emulator.mocks import machine
-    from emulator.mocks import time as mock_time
+    from emulator.mocks import (
+        badgeware,
+        blinky,
+        breakout_bme280,
+        easing,
+        machine,
+        network,
+        ntptime,
+        picographics,
+        picovector,
+        pimoroni,
+        powman,
+        rp2,
+        urequests,
+    )
     from emulator.mocks import gc as mock_gc
     from emulator.mocks import micropython as mock_micropython
-    from emulator.mocks import network
     from emulator.mocks import socket as mock_socket
-    from emulator.mocks import blinky
-    from emulator.mocks import badgeware
-    from emulator.mocks import picovector
-    from emulator.mocks import picographics
-    from emulator.mocks import ntptime
-    from emulator.mocks import powman
-    from emulator.mocks import pimoroni
-    from emulator.mocks import breakout_bme280
-    from emulator.mocks import easing
-    from emulator.mocks import urequests
-    from emulator.mocks import rp2
+    from emulator.mocks import time as mock_time
 
     # Core MicroPython modules
     sys.modules["machine"] = machine

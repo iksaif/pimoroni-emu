@@ -1,7 +1,7 @@
 """Simple demo for Inky Impression (Raspberry Pi/inky library)."""
 
-from PIL import Image, ImageDraw, ImageFont
 from inky.auto import auto
+from PIL import Image, ImageDraw
 
 # Auto-detect and initialize the display
 inky_display = auto(verbose=True)

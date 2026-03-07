@@ -1,6 +1,7 @@
 """Mock implementation of MicroPython's gc module."""
 
 import gc as _gc
+
 from emulator import get_state
 
 

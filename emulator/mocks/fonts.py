@@ -4,7 +4,6 @@ Provides Pimoroni-compatible bitmap fonts. Downloads from GitHub on first use
 and caches locally for subsequent runs.
 """
 
-import os
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple

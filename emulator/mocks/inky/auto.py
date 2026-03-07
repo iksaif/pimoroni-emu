@@ -4,11 +4,12 @@ In the emulator, auto-detection returns a mock display based on
 the configured device type.
 """
 
-from typing import Optional, Any
+from typing import Any
+
 from emulator import get_state
 from emulator.mocks.inky.inky import Inky
-from emulator.mocks.inky.inky_uc8159 import InkyUC8159
 from emulator.mocks.inky.inky_ac073tc1a import InkyAC073TC1A
+from emulator.mocks.inky.inky_uc8159 import InkyUC8159
 
 
 def auto(

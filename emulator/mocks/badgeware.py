@@ -4,11 +4,10 @@ Badgeware provides the high-level API for the Blinky badge including
 drawing primitives, shapes, colors, input handling, and more.
 """
 
-import math
-import time as _time
 import builtins
-from emulator import get_state
+import time as _time
 
+from emulator import get_state
 
 # --- Color ---
 
@@ -768,7 +767,7 @@ def is_dir(path):
     try:
         flags = os.stat(path)
         return flags[0] & 0x4000
-    except:
+    except OSError:
         return False
 
 

@@ -5,8 +5,8 @@ Inky Impression and other Raspberry Pi-based e-ink displays.
 """
 
 from emulator.mocks.inky.inky import Inky, InkyMock
-from emulator.mocks.inky.inky_uc8159 import InkyUC8159
 from emulator.mocks.inky.inky_ac073tc1a import InkyAC073TC1A
+from emulator.mocks.inky.inky_uc8159 import InkyUC8159
 
 # Color constants
 WHITE = 0

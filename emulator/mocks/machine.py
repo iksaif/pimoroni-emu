@@ -1,9 +1,9 @@
 """Mock implementation of MicroPython's machine module."""
 
 import time as _time
-from typing import Callable, Optional, Any
-from emulator import get_state
+from typing import Callable, Optional
 
+from emulator import get_state
 
 # Constants
 PWRON_RESET = 1

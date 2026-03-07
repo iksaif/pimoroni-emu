@@ -3,7 +3,6 @@
 Uses Pillow to decode PNG images and render them to PicoGraphics displays.
 """
 
-from typing import Optional
 from emulator import get_state
 
 
@@ -54,8 +53,9 @@ class PNG:
             RuntimeError: If data cannot be decoded
         """
         try:
-            from PIL import Image
             import io
+
+            from PIL import Image
             self._image = Image.open(io.BytesIO(data))
             self._width = self._image.width
             self._height = self._image.height

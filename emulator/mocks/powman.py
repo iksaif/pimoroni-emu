@@ -5,7 +5,6 @@ This module provides power management functions for RP2350 devices.
 
 from emulator import get_state
 
-
 # Wake reason constants
 WAKE_UNKNOWN = 255
 WAKE_BUTTON_A = 1

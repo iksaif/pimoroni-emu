@@ -1,11 +1,12 @@
 """Image comparison utilities for visual regression testing."""
 
+import math
 from pathlib import Path
 from typing import Optional, Tuple, Union
-from PIL import Image
-import math
 
-from emulator import get_state, get_display
+from PIL import Image
+
+from emulator import get_display, get_state
 
 
 def compare_images(

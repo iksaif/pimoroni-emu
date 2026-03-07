@@ -5,7 +5,6 @@ The blinky module provides the display driver for the 39x26 LED matrix display.
 
 from emulator import get_state
 
-
 # Display dimensions (39x26 = 1014 LED positions, 872 actual LEDs)
 WIDTH = 39
 HEIGHT = 26

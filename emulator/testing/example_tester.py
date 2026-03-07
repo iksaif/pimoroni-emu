@@ -7,13 +7,13 @@ Usage:
 """
 
 import argparse
+import json
 import subprocess
 import sys
-import json
-from pathlib import Path
-from dataclasses import dataclass, field, asdict
-from typing import List, Optional
 import time
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import List, Optional
 
 
 @dataclass
@@ -75,7 +75,7 @@ def categorize_error(stderr: str, stdout: str) -> tuple:
     # Check for file not found
     file_match = re.search(r"FileNotFoundError:.*'([^']+)'", full_output)
     if file_match:
-        return ("file", None, None, f"File not found")
+        return ("file", None, None, "File not found")
 
     # Check for TypeError (often means wrong API usage)
     type_match = re.search(r"TypeError: ([^\n]+)", full_output)
@@ -272,19 +272,19 @@ def run_tests(
             print(f"\033[32mPASS\033[0m ({result.frames} frames, {result.duration:.1f}s)")
         elif result.status == "timeout":
             report.timeouts += 1
-            print(f"\033[33mTIMEOUT\033[0m")
+            print("\033[33mTIMEOUT\033[0m")
         elif result.status == "skip":
             report.skipped += 1
-            print(f"\033[36mSKIP\033[0m")
+            print("\033[36mSKIP\033[0m")
         elif result.status == "unknown":
             report.unknown += 1
-            print(f"\033[33mUNKNOWN\033[0m (no frames)")
+            print("\033[33mUNKNOWN\033[0m (no frames)")
         elif result.status == "fail":
             report.failed += 1
-            print(f"\033[31mFAIL\033[0m")
+            print("\033[31mFAIL\033[0m")
         else:
             report.errors += 1
-            print(f"\033[31mERROR\033[0m")
+            print("\033[31mERROR\033[0m")
 
         if verbose and result.error:
             print(f"    Error: {result.error[:200]}")

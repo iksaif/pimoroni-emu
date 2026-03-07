@@ -1,9 +1,9 @@
 """Display renderers for Pimoroni emulator."""
 
 from emulator.display.base import BaseDisplay
-from emulator.display.tft import TFTDisplay
-from emulator.display.led_matrix import LEDMatrixDisplay
 from emulator.display.eink import EInkDisplay
+from emulator.display.led_matrix import LEDMatrixDisplay
+from emulator.display.tft import TFTDisplay
 
 
 def create_display(device, headless: bool = False) -> BaseDisplay:

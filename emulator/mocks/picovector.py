@@ -8,7 +8,8 @@ import math
 import os
 import struct
 import sys
-from typing import List, Tuple, Optional, Any
+from typing import List, Optional, Tuple
+
 from emulator import get_state
 
 try:

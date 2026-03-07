@@ -6,6 +6,7 @@ using the `inky` Python library (not MicroPython/PicoGraphics).
 
 from dataclasses import dataclass, field
 from typing import List, Tuple
+
 from emulator.devices.base import BaseDevice, ButtonConfig
 
 

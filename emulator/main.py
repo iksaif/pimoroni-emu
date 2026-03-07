@@ -1,8 +1,8 @@
 """Main entry point for Pimoroni emulator."""
 
 import argparse
-import sys
 import os
+import sys
 
 # Work around macOS Metal renderer crash with pygame/SDL2
 # (IOGPUMetalCommandBuffer validate assertion failure)
@@ -10,16 +10,15 @@ if sys.platform == "darwin" and "SDL_RENDER_DRIVER" not in os.environ:
     os.environ["SDL_RENDER_DRIVER"] = "opengl"
 import runpy
 from pathlib import Path
-from typing import Optional
 
-from emulator import get_state, _emulator_state
+from emulator import _emulator_state, get_state
 from emulator.devices import get_device, list_devices
 from emulator.display import create_display
 from emulator.hardware.buttons import ButtonManager
-from emulator.hardware.touch import TouchManager
 from emulator.hardware.sensors import SensorManager
+from emulator.hardware.touch import TouchManager
 from emulator.hardware.wifi import WiFiManager
-from emulator.mocks import install_mocks, install_inky_mocks, install_badgeware_mocks, setup_vfs
+from emulator.mocks import install_badgeware_mocks, install_inky_mocks, install_mocks, setup_vfs
 
 
 def parse_args():
@@ -145,19 +144,19 @@ def main():
         app_path_str = str(app_path).lower()
         if "blinky" in app_path_str:
             device_name = "blinky"
-            print(f"Auto-detected device: blinky (from path)")
+            print("Auto-detected device: blinky (from path)")
         elif "tufty" in app_path_str:
             device_name = "tufty"
-            print(f"Auto-detected device: tufty (from path)")
+            print("Auto-detected device: tufty (from path)")
         elif "badger" in app_path_str:
             device_name = "badger"
-            print(f"Auto-detected device: badger (from path)")
+            print("Auto-detected device: badger (from path)")
         elif "impression" in app_path_str or "inky_impression" in app_path_str:
             device_name = "inky_impression"
-            print(f"Auto-detected device: inky_impression (from path)")
+            print("Auto-detected device: inky_impression (from path)")
         elif "inky" in app_path_str:
             device_name = "inky_frame"
-            print(f"Auto-detected device: inky_frame (from path)")
+            print("Auto-detected device: inky_frame (from path)")
 
     # Get device
     try:
@@ -201,7 +200,7 @@ def main():
         tracker.start()
         _emulator_state["memory_tracker"] = tracker
         print(f"  Memory: {device.heap_size // 1024}KB heap" +
-              (f" + 8MB PSRAM" if device.has_psram else "") +
+              (" + 8MB PSRAM" if device.has_psram else "") +
               (" [strict]" if args.strict_memory else ""))
 
     # Install mocks based on device type
@@ -246,7 +245,7 @@ def main():
     button_manager = ButtonManager(device)
     touch_manager = TouchManager(device)
     sensor_manager = SensorManager(device)
-    wifi_manager = WiFiManager(device)
+    WiFiManager(device)  # registers itself in emulator state
 
     # Run the app
     try:
@@ -364,8 +363,9 @@ def run_app_interactive(
     max_frames: int = 0,
 ):
     """Run app with interactive pygame window."""
-    import pygame
     import threading
+
+    import pygame
 
     state = get_state()
 

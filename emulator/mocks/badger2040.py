@@ -4,8 +4,7 @@ Badger 2040 is an e-ink badge with 296x128 display and 5 front buttons.
 """
 
 from emulator import get_state
-from emulator.mocks.picographics import PicoGraphics, DISPLAY_BADGER_2350, PEN_1BIT
-
+from emulator.mocks.picographics import DISPLAY_BADGER_2350, PEN_1BIT, PicoGraphics
 
 # Display dimensions
 WIDTH = 296

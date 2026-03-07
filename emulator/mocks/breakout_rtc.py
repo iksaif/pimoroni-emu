@@ -1,6 +1,7 @@
 """Mock implementation of PCF85063A RTC breakout."""
 
 import time as _time
+
 from emulator.mocks.base import I2CSensorMock
 
 

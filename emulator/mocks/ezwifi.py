@@ -28,7 +28,7 @@ class EzWiFi:
         """Connect to WiFi (simulated)."""
         if ssid is None:
             try:
-                from secrets import WIFI_SSID, WIFI_PASSWORD
+                from secrets import WIFI_PASSWORD, WIFI_SSID
                 ssid = WIFI_SSID
                 password = WIFI_PASSWORD
             except ImportError:
@@ -38,7 +38,7 @@ class EzWiFi:
 
         trace_log("ezwifi", f"Connecting to {ssid}")
 
-        from emulator.mocks.network import WLAN, STA_IF
+        from emulator.mocks.network import STA_IF, WLAN
         wlan = WLAN(STA_IF)
         wlan.active(True)
         wlan.connect(ssid, password or "")

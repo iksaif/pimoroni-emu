@@ -1,6 +1,7 @@
 """Sensor simulation."""
 
 from typing import Tuple
+
 from emulator import get_state
 from emulator.devices.base import BaseDevice
 

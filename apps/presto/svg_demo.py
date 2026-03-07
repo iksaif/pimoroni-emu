@@ -5,7 +5,8 @@ Demonstrates Polygon.from_svg() — an emulator extension.
 """
 
 import time
-from picographics import PicoGraphics, DISPLAY_PRESTO, PEN_RGB565
+
+from picographics import DISPLAY_PRESTO, PEN_RGB565, PicoGraphics
 from picovector import PicoVector, Polygon, Transform
 
 display = PicoGraphics(DISPLAY_PRESTO, pen_type=PEN_RGB565)

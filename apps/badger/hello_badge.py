@@ -1,8 +1,9 @@
 """Simple e-ink badge for Badger 2350."""
 
-from picographics import PicoGraphics, DISPLAY_BADGER_2350
-from pimoroni import Button
 import time
+
+from picographics import DISPLAY_BADGER_2350, PicoGraphics
+from pimoroni import Button
 
 # Set up display (e-ink)
 display = PicoGraphics(display=DISPLAY_BADGER_2350)

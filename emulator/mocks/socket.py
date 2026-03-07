@@ -5,8 +5,8 @@ Uses real sockets so that network requests pass through to the host.
 
 import socket as _socket
 from typing import Optional, Tuple
-from emulator import get_state
 
+from emulator import get_state
 
 # Constants
 AF_INET = _socket.AF_INET

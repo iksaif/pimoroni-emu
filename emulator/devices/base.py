@@ -1,7 +1,7 @@
 """Base device configuration class."""
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 
 @dataclass

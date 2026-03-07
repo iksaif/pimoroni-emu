@@ -8,8 +8,9 @@ Run: pimoroni-emulator --device tufty apps/tufty/button_irq_demo.py
 """
 
 import time
+
 from machine import Pin
-from picographics import PicoGraphics, DISPLAY_TUFTY_2350
+from picographics import DISPLAY_TUFTY_2350, PicoGraphics
 
 display = PicoGraphics(display=DISPLAY_TUFTY_2350)
 WIDTH, HEIGHT = display.get_bounds()

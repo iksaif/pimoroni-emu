@@ -1,7 +1,8 @@
 """Base Inky class mock for Raspberry Pi e-ink displays."""
 
-from typing import Optional, Tuple, List, Any
-from emulator import get_state, get_display
+from typing import Any, List, Tuple
+
+from emulator import get_display, get_state
 
 # Try to import PIL for image handling
 try:

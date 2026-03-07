@@ -3,11 +3,11 @@
 Provides state management and app launching utilities for Badger 2040.
 """
 
-import os
 import json
+import os
 from pathlib import Path
-from emulator import get_state
 
+from emulator import get_state
 
 # State storage directory (in emulator, use a temp location)
 STATE_DIR = "/tmp/badger_os_state"

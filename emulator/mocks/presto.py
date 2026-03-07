@@ -2,11 +2,11 @@
 
 from collections import namedtuple
 from typing import Tuple
+
 from emulator import get_state
 from emulator.mocks.base import trace_log
-from emulator.mocks.picographics import PicoGraphics, DISPLAY_PRESTO, PEN_RGB565
+from emulator.mocks.picographics import DISPLAY_PRESTO, PEN_RGB565, PicoGraphics
 from emulator.mocks.touch import FT6236
-
 
 # LED positions (7 SK6812 LEDs around the edge)
 NUM_LEDS = 7
@@ -81,7 +81,7 @@ class Presto:
 
     def connect(self, ssid: str = None, password: str = None, timeout: int = 30) -> bool:
         """Connect to WiFi network."""
-        from emulator.mocks.network import WLAN, STA_IF
+        from emulator.mocks.network import STA_IF, WLAN
 
         wlan = WLAN(STA_IF)
         wlan.active(True)
@@ -189,9 +189,9 @@ class Buzzer:
 
     def _generate_tone(self, freq: int, duty: float = 0.5):
         """Generate a square wave tone as a pygame Sound."""
-        import pygame
         import array
-        import math
+
+        import pygame
         sample_rate = 44100
         duration_samples = sample_rate  # 1 second looping buffer
         buf = array.array('h')  # signed 16-bit
@@ -206,7 +206,6 @@ class Buzzer:
 
     def set_tone(self, freq: int, duty: float = 0.5):
         """Set buzzer tone frequency and duty cycle."""
-        old_freq = self._freq
         self._freq = freq
         self._duty = duty
         trace_log("Buzzer", f"set_tone({freq}, {duty})")
@@ -219,7 +218,6 @@ class Buzzer:
             self._channel.stop()
 
         if freq > 20:
-            import pygame
             self._sound = self._generate_tone(freq, duty)
             self._channel = self._sound.play(loops=-1)
         else:
@@ -243,7 +241,7 @@ class WiFi:
     @staticmethod
     def connect(ssid: str, password: str = "", timeout: int = 30) -> bool:
         """Connect to WiFi."""
-        from emulator.mocks.network import WLAN, STA_IF
+        from emulator.mocks.network import STA_IF, WLAN
         wlan = WLAN(STA_IF)
         wlan.active(True)
         wlan.connect(ssid, password)

@@ -5,8 +5,8 @@ directory that simulates the SD card contents.
 """
 
 from pathlib import Path
-from emulator import get_state
 
+from emulator import get_state
 
 # Default SD card directory (can be overridden via emulator state)
 DEFAULT_SD_PATH = Path("/tmp/presto_sdcard")

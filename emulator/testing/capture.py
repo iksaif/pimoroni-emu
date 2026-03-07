@@ -2,8 +2,8 @@
 
 from pathlib import Path
 from typing import Optional
-from emulator import get_state, get_display
 
+from emulator import get_display, get_state
 
 _recording = False
 _recording_dir: Optional[Path] = None

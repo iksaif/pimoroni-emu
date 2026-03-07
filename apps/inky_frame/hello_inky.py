@@ -1,8 +1,9 @@
 """Simple demo for Inky Frame 7.3" (MicroPython/PicoGraphics)."""
 
-from picographics import PicoGraphics, DISPLAY_INKY_FRAME_7
-from pimoroni import Button
 import time
+
+from picographics import DISPLAY_INKY_FRAME_7, PicoGraphics
+from pimoroni import Button
 
 # Set up display (Spectra 6-color e-ink)
 display = PicoGraphics(display=DISPLAY_INKY_FRAME_7)

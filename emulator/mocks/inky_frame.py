@@ -4,7 +4,8 @@ This provides the button and LED control API used by Inky Frame devices.
 The inky_frame module is baked into Pimoroni's MicroPython firmware.
 """
 
-from typing import Optional, Callable
+from typing import Callable, Optional
+
 from emulator import get_state
 
 # Pen colour indices (matching upstream C++ enum)

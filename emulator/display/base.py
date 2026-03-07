@@ -1,14 +1,12 @@
 """Base display renderer class."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
 from pathlib import Path
+from typing import List, Optional, Tuple
+
 from PIL import Image
-import io
-import sys
 
 from emulator import get_state
-
 
 # ASCII grayscale ramp (darkest to brightest)
 ASCII_RAMP = " .:-=+*#%@"

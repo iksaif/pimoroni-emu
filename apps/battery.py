@@ -156,8 +156,9 @@ elif library_type == 'badgeware':
     run(update)
 
 elif "presto" in device_name.lower():
-    from presto import Presto
     import time
+
+    from presto import Presto
 
     presto = Presto()
     display = presto.display
@@ -218,8 +219,9 @@ elif "presto" in device_name.lower():
         time.sleep(0.1)
 
 else:
-    from picographics import PicoGraphics
     import time
+
+    from picographics import PicoGraphics
 
     if "tufty" in device_name.lower():
         from picographics import DISPLAY_TUFTY_2350

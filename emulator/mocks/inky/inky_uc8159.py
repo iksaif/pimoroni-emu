@@ -1,6 +1,7 @@
 """Mock for InkyUC8159 (7-color Inky Impression) displays."""
 
-from typing import Tuple, List, Any
+from typing import Any, List, Tuple
+
 from emulator.mocks.inky.inky import Inky
 
 try:

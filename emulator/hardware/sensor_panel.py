@@ -4,7 +4,8 @@ Provides in-window sliders to control mock sensor values.
 The panel auto-discovers sensors and only shows when sensors are used.
 """
 
-from typing import Dict, List, Optional, Tuple, Callable, Any
+from typing import Callable, List, Optional, Tuple
+
 from emulator import get_state
 
 try:

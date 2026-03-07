@@ -1,8 +1,8 @@
 """API call tracing for debugging."""
 
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from emulator import get_state
 

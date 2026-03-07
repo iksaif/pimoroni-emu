@@ -1,10 +1,11 @@
 """Mock implementation of JPEG decoder for Pimoroni displays."""
 
-from typing import Optional, Callable
-from PIL import Image
 import io
-from emulator import get_state
+from typing import Callable, Optional
 
+from PIL import Image
+
+from emulator import get_state
 
 # Scale constants
 JPEG_SCALE_FULL = 0  # 1:1

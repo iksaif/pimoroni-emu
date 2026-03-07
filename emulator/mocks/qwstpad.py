@@ -1,8 +1,9 @@
 """Mock implementation of QwSTPad controller (I2C gamepad)."""
 
 from collections import OrderedDict
-from emulator.mocks.base import I2CSensorMock
+
 from emulator import get_state
+from emulator.mocks.base import I2CSensorMock
 
 # I2C addresses (matching upstream: 0x21, 0x23, 0x25, 0x27)
 DEFAULT_ADDRESS = 0x21

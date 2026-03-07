@@ -1,19 +1,19 @@
 """Test harness for device testing."""
 
+import runpy
 import sys
 import threading
 import time
-import runpy
 from pathlib import Path
 from typing import Optional
 from unittest import TestCase
 
-from emulator import get_state, _emulator_state
+from emulator import _emulator_state, get_state
 from emulator.devices import get_device
 from emulator.display import create_display
 from emulator.hardware.buttons import ButtonManager
-from emulator.hardware.touch import TouchManager
 from emulator.hardware.sensors import SensorManager
+from emulator.hardware.touch import TouchManager
 from emulator.mocks import install_mocks
 from emulator.testing.capture import screenshot
 from emulator.testing.compare import assert_display_matches

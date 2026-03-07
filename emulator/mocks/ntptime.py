@@ -4,8 +4,8 @@ Provides NTP time synchronization.
 """
 
 import time as _time
-from emulator import get_state
 
+from emulator import get_state
 
 # Default NTP server
 host = "pool.ntp.org"
@@ -18,7 +18,7 @@ def settime():
     """
     state = get_state()
     if state.get("trace"):
-        print(f"[ntptime] settime() called (using system time)")
+        print("[ntptime] settime() called (using system time)")
 
 
 def time() -> int:

@@ -7,6 +7,7 @@ virtual filesystem root.
 
 import os as _real_os
 from pathlib import Path
+
 from emulator import get_state
 
 

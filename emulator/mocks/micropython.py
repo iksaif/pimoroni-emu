@@ -24,7 +24,7 @@ def mem_info(verbose: bool = False):
     else:
         total, used, free = 8388608, 524288, 7864320
     print("Memory info:")
-    print(f"  stack: 4096 bytes")
+    print("  stack: 4096 bytes")
     print(f"  GC: total={total}, used={used}, free={free}")
     if verbose:
         print("  No detailed GC blocks in emulator")

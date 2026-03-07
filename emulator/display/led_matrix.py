@@ -2,9 +2,10 @@
 
 import copy
 import threading
-from typing import List, Optional
-from emulator.display.base import BaseDisplay, draw_memory_bar
+from typing import List
+
 from emulator import get_state
+from emulator.display.base import BaseDisplay, draw_memory_bar
 
 # Lazy import pygame
 pygame = None
@@ -289,7 +290,6 @@ class LEDMatrixDisplay(BaseDisplay):
         if "qwstpad" not in state:
             return None
 
-        win_w = self._window.get_width()
         win_h = self._window.get_height()
 
         btn_size = 28

@@ -1,8 +1,9 @@
 """Simple badge display for Tufty 2350."""
 
-from picographics import PicoGraphics, DISPLAY_TUFTY_2350
-from pimoroni import Button
 import time
+
+from picographics import DISPLAY_TUFTY_2350, PicoGraphics
+from pimoroni import Button
 
 # Set up display
 display = PicoGraphics(display=DISPLAY_TUFTY_2350)

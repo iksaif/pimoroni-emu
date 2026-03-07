@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import List, Tuple
+
 from emulator.devices.base import BaseDevice, ButtonConfig
 
 

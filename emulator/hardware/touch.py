@@ -1,6 +1,7 @@
 """Touchscreen simulation."""
 
 from typing import Optional, Tuple
+
 from emulator import get_state
 from emulator.devices.base import BaseDevice
 

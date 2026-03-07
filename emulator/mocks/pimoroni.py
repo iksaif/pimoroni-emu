@@ -3,8 +3,8 @@
 Contains hardware helpers like Button, RGBLED, Buzzer, etc.
 """
 
-from typing import Callable, Optional
 import time as _time
+
 from emulator import get_state
 
 
@@ -129,8 +129,9 @@ class Buzzer:
 
     def _generate_tone(self, freq: int, duty: float = 0.5):
         """Generate a square wave tone as a pygame Sound."""
-        import pygame
         import array
+
+        import pygame
         sample_rate = 44100
         duration_samples = sample_rate  # 1 second looping buffer
         buf = array.array('h')  # signed 16-bit
@@ -156,7 +157,6 @@ class Buzzer:
             self._channel.stop()
 
         if frequency > 20:
-            import pygame
             self._sound = self._generate_tone(frequency, duty)
             self._channel = self._sound.play(loops=-1)
         else:

@@ -15,8 +15,8 @@ except ImportError:
 
 # Initialize BME280 sensor (available on all MicroPython devices)
 if library_type != 'inky':
-    from pimoroni import PimoroniI2C
     from breakout_bme280 import BreakoutBME280
+    from pimoroni import PimoroniI2C
 
     i2c = PimoroniI2C()
     bme = BreakoutBME280(i2c)
@@ -84,8 +84,9 @@ elif library_type == 'badgeware':
     run(update)
 
 elif "presto" in device_name.lower():
-    from presto import Presto
     import time
+
+    from presto import Presto
 
     presto = Presto()
     display = presto.display
@@ -115,8 +116,9 @@ elif "presto" in device_name.lower():
         time.sleep(1)
 
 else:
-    from picographics import PicoGraphics
     import time
+
+    from picographics import PicoGraphics
 
     if "tufty" in device_name.lower():
         from picographics import DISPLAY_TUFTY_2350

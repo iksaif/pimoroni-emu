@@ -3,8 +3,8 @@
 Note: SCD41 uses module-level functions, not a class.
 """
 
-from emulator.mocks.base import trace_log
 from emulator import get_state
+from emulator.mocks.base import trace_log
 
 _co2 = 420
 _temperature = 22.5
@@ -14,7 +14,7 @@ _started = False
 
 def init(i2c):
     """Initialize the SCD41 sensor."""
-    trace_log("SCD41", f"Initialized on I2C")
+    trace_log("SCD41", "Initialized on I2C")
     get_state()["scd41"] = True
 
 
