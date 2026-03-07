@@ -182,12 +182,20 @@ class EInkDisplay(BaseDisplay):
         if not self._display_surface:
             return
 
-        # Save previous frame for transition
-        prev_surface = self._display_surface.copy()
-
         # Convert new buffer to e-ink colors on a scratch surface
         self._convert_buffer(buffer)
         new_surface = self._display_surface.copy()
+
+        # Skip animation if disabled
+        if get_state().get("no_eink_animation"):
+            self._display_surface = new_surface
+            with self._render_lock:
+                self._ready_surface = new_surface.copy()
+            self._autosave_frame()
+            return
+
+        # Save previous frame for transition
+        prev_surface = self._display_surface.copy()
 
         # Animate the refresh: invert flash -> black -> progressive reveal
         self._refresh_animation = True

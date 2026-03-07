@@ -106,6 +106,12 @@ Supported devices: tufty, blinky, presto, badger
         help="Raise MemoryError when emulated heap is exceeded (implies --memory-tracking)",
     )
 
+    parser.add_argument(
+        "--no-eink-animation",
+        action="store_true",
+        help="Disable slow e-ink refresh animation (instant updates)",
+    )
+
     return parser.parse_args()
 
 
@@ -242,6 +248,7 @@ def main():
     _emulator_state["trace"] = args.trace
     _emulator_state["max_frames"] = args.max_frames
     _emulator_state["app_dir"] = str(app_path.parent.absolute())
+    _emulator_state["no_eink_animation"] = args.no_eink_animation
 
     # Set up memory tracking (before mocks, so tracemalloc captures app allocations)
     memory_tracking = args.memory_tracking or args.strict_memory
