@@ -12,7 +12,7 @@ import runpy
 from pathlib import Path
 
 from emulator import _emulator_state, get_state
-from emulator.devices import get_device, list_devices
+from emulator.devices import DEVICES, get_device, list_devices
 from emulator.display import create_display
 from emulator.hardware.buttons import ButtonManager
 from emulator.hardware.sensors import SensorManager
@@ -109,16 +109,71 @@ Supported devices: tufty, blinky, presto, badger
     return parser.parse_args()
 
 
+def _print_device_table():
+    """Print a formatted table of available devices."""
+    # Group aliases by device class to deduplicate
+    seen_classes = {}
+    for name, device_cls in DEVICES.items():
+        if device_cls not in seen_classes:
+            seen_classes[device_cls] = {"primary": name, "aliases": [], "device": device_cls()}
+        else:
+            seen_classes[device_cls]["aliases"].append(name)
+
+    # Build rows
+    rows = []
+    for info in seen_classes.values():
+        dev = info["device"]
+        aliases = info["aliases"]
+        primary = info["primary"]
+
+        # Determine Python runtime
+        lib = getattr(dev, "library_type", "picographics")
+        if lib == "inky":
+            runtime = "CPython"
+        else:
+            runtime = "MicroPython"
+
+        # Display type label
+        dtype = dev.display_type
+        if dtype == "tft":
+            display_label = "TFT"
+        elif dtype == "led_matrix":
+            display_label = "LED matrix"
+        elif dtype in ("eink", "eink_color"):
+            display_label = f"e-ink ({dev.eink_colors}c)"
+        else:
+            display_label = dtype
+
+        res = f"{dev.display_width}x{dev.display_height}"
+        alias_str = ", ".join(aliases) if aliases else ""
+
+        rows.append((primary, alias_str, display_label, res, runtime, dev.description))
+
+    # Sort by primary name
+    rows.sort(key=lambda r: r[0])
+
+    # Calculate column widths
+    headers = ("Device", "Aliases", "Display", "Resolution", "Runtime", "Description")
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, val in enumerate(row):
+            widths[i] = max(widths[i], len(val))
+
+    # Print table
+    fmt = "  ".join(f"{{:<{w}}}" for w in widths)
+    print(fmt.format(*headers))
+    print(fmt.format(*("-" * w for w in widths)))
+    for row in rows:
+        print(fmt.format(*row))
+
+
 def main():
     """Main entry point."""
     args = parse_args()
 
     # List devices and exit
     if args.list_devices:
-        print("Available devices:")
-        for name in sorted(set(list_devices())):
-            device = get_device(name)
-            print(f"  {name:12} - {device.description}")
+        _print_device_table()
         return 0
 
     # Require app path
