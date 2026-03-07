@@ -25,7 +25,8 @@ class JPEG:
     def open_file(self, filename: str) -> int:
         """Open JPEG from file."""
         try:
-            self._image = Image.open(filename)
+            from emulator.mocks import _translate_path
+            self._image = Image.open(_translate_path(filename))
             if self._image.mode != "RGB":
                 self._image = self._image.convert("RGB")
             if get_state().get("trace"):

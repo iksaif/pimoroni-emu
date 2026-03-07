@@ -32,9 +32,9 @@ class SDCard:
         self._baudrate = baudrate
         self._mounted = False
 
-        # Get SD card path from emulator state or use default
+        # Get SD card path from emulator state, fall back to app directory
         state = get_state()
-        sd_path = state.get("sdcard_path", DEFAULT_SD_PATH)
+        sd_path = state.get("sdcard_path") or state.get("app_dir") or DEFAULT_SD_PATH
         self._path = Path(sd_path)
 
         # Ensure the directory exists

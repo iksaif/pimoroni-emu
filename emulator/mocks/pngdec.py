@@ -32,7 +32,8 @@ class PNG:
         """
         try:
             from PIL import Image
-            self._image = Image.open(filename)
+            from emulator.mocks import _translate_path
+            self._image = Image.open(_translate_path(filename))
             self._width = self._image.width
             self._height = self._image.height
             self._file_path = filename

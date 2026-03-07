@@ -139,6 +139,22 @@ def _patch_os_uname():
     if not hasattr(os, "dupterm"):
         os.dupterm = uos.dupterm
 
+    # Patch os.stat/os.listdir/os.remove/os.rename to translate MicroPython paths
+    # (e.g. /sd/img/... -> <app_dir>/img/...) through mount points.
+    _original_stat = os.stat
+    _original_listdir = os.listdir
+    _original_remove = os.remove
+    _original_rename = os.rename
+    os.stat = lambda path, *args, **kwargs: _original_stat(_translate_path(str(path)), *args, **kwargs)
+    os.listdir = lambda path=".", *args, **kwargs: _original_listdir(_translate_path(str(path)), *args, **kwargs)
+    os.remove = lambda path, *args, **kwargs: _original_remove(_translate_path(str(path)), *args, **kwargs)
+    os.rename = lambda old, new, *args, **kwargs: _original_rename(
+        _translate_path(str(old)), _translate_path(str(new)), *args, **kwargs
+    )
+
+    # Always patch builtins.open for mount point path translation
+    builtins.open = _vfs_open
+
 
 def install_mocks():
     """Install all mock modules into sys.modules."""

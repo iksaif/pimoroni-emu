@@ -241,6 +241,7 @@ def main():
     _emulator_state["headless"] = args.headless
     _emulator_state["trace"] = args.trace
     _emulator_state["max_frames"] = args.max_frames
+    _emulator_state["app_dir"] = str(app_path.parent.absolute())
 
     # Set up memory tracking (before mocks, so tracemalloc captures app allocations)
     memory_tracking = args.memory_tracking or args.strict_memory
