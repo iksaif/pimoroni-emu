@@ -329,11 +329,28 @@ def run_app_headless(app_path: Path, max_frames: int = 0):
     thread = threading.Thread(target=app_thread, daemon=True)
     thread.start()
 
-    # Wait for app to finish or max frames
+    # Wait for app to finish or max frames.
+    # Also track idle time: if no new frame is rendered for 5 seconds,
+    # the app is likely waiting for input that won't come in headless mode.
+    idle_timeout = 5.0
+    last_frame = state.get("frame_count", 0)
+    last_frame_time = time.monotonic()
+
     while state["running"]:
         time.sleep(0.1)
-        if max_frames > 0 and state.get("frame_count", 0) >= max_frames:
+        current_frame = state.get("frame_count", 0)
+
+        if current_frame != last_frame:
+            last_frame = current_frame
+            last_frame_time = time.monotonic()
+
+        if max_frames > 0 and current_frame >= max_frames:
             print(f"Reached max frames ({max_frames})")
+            state["running"] = False
+            break
+
+        if max_frames > 0 and current_frame > 0 and time.monotonic() - last_frame_time > idle_timeout:
+            print(f"Idle timeout after {current_frame} frames (no new frame for {idle_timeout}s)")
             state["running"] = False
             break
 

@@ -88,7 +88,8 @@ draw_screen()
 # Main loop
 while True:
     # Get touch state
-    x, y, pressed = presto.touch()
+    presto.touch_poll()
+    x, y, pressed = presto.touch_a
 
     if pressed:
         touch_x, touch_y = x, y
