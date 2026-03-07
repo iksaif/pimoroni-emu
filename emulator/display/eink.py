@@ -1,5 +1,6 @@
 """E-ink display renderer for Badger 2350 and Inky Frame."""
 
+import threading
 import time as _time
 from typing import List, Tuple
 
@@ -66,6 +67,8 @@ class EInkDisplay(BaseDisplay):
         super().__init__(device, headless)
         self._pygame_surface = None
         self._display_surface = None
+        self._ready_surface = None  # Thread-safe front buffer for _draw_window
+        self._render_lock = threading.Lock()
         self._clock = None
 
         # E-ink simulation
@@ -106,6 +109,9 @@ class EInkDisplay(BaseDisplay):
         self._display_surface = pygame.Surface(
             (self.device.display_width, self.device.display_height)
         )
+        self._display_surface.fill((245, 245, 240))  # e-ink white
+        with self._render_lock:
+            self._ready_surface = self._display_surface.copy()
 
         self._clock = pygame.time.Clock()
 
@@ -159,7 +165,11 @@ class EInkDisplay(BaseDisplay):
                 self._display_surface.set_at((x, y), pixel_color)
 
     def render(self, buffer: List[List[int]]):
-        """Render framebuffer as e-ink display with slow refresh animation."""
+        """Render framebuffer as e-ink display with slow refresh animation.
+
+        Called from the app thread. Uses _render_lock to safely publish
+        frames to _ready_surface, which _draw_window reads from the main thread.
+        """
         self._last_buffer = buffer
         self._frame_count += 1
 
@@ -173,9 +183,9 @@ class EInkDisplay(BaseDisplay):
             return
 
         # Save previous frame for transition
-        self._prev_display_surface = self._display_surface.copy()
+        prev_surface = self._display_surface.copy()
 
-        # Convert new buffer to e-ink colors
+        # Convert new buffer to e-ink colors on a scratch surface
         self._convert_buffer(buffer)
         new_surface = self._display_surface.copy()
 
@@ -188,6 +198,9 @@ class EInkDisplay(BaseDisplay):
         phase_black = 0.15    # brief black
         phase_reveal = self._refresh_duration - phase_invert - phase_black
 
+        # Scratch surface for animation frames (avoids mutating _display_surface)
+        anim_surface = self._display_surface.copy()
+
         while True:
             elapsed = _time.time() - self._refresh_start_time
             if elapsed >= self._refresh_duration:
@@ -195,41 +208,46 @@ class EInkDisplay(BaseDisplay):
 
             if elapsed < phase_invert:
                 # Phase 1: invert the old image
-                inverted = self._prev_display_surface.copy()
-                inverted.fill((255, 255, 255))
-                inverted.blit(self._prev_display_surface, (0, 0),
-                              special_flags=pygame.BLEND_RGB_SUB)
-                self._display_surface = inverted
+                anim_surface.blit(prev_surface, (0, 0))
+                anim_surface.fill((255, 255, 255), special_flags=pygame.BLEND_RGB_SUB)
             elif elapsed < phase_invert + phase_black:
                 # Phase 2: black flash
-                self._display_surface.fill((30, 30, 35))
+                anim_surface.fill((30, 30, 35))
             else:
                 # Phase 3: progressive top-to-bottom reveal
                 reveal_t = (elapsed - phase_invert - phase_black) / phase_reveal
                 reveal_row = int(reveal_t * disp_h)
-
-                # Start from blank (e-ink white) and reveal new content top-down
-                self._display_surface.fill((245, 245, 240))
-                self._display_surface.blit(
+                anim_surface.fill((245, 245, 240))
+                anim_surface.blit(
                     new_surface,
                     (0, 0),
                     (0, 0, self.device.display_width, reveal_row),
                 )
 
-            self._draw_window()
+            # Publish animation frame to front buffer
+            with self._render_lock:
+                self._ready_surface = anim_surface.copy()
             _time.sleep(0.016)  # ~60 fps animation
 
-        # Final: show complete new image
+        # Final: publish complete new image
         self._display_surface = new_surface
         self._refresh_animation = False
-        self._draw_window()
+        with self._render_lock:
+            self._ready_surface = new_surface.copy()
 
         # Autosave if enabled
         self._autosave_frame()
 
     def _draw_window(self):
-        """Draw the full emulator window."""
+        """Draw the full emulator window (called from main thread)."""
         if not self._window:
+            return
+
+        # Grab front buffer snapshot
+        with self._render_lock:
+            surface = self._ready_surface
+
+        if not surface:
             return
 
         # E-ink paper background
@@ -240,7 +258,7 @@ class EInkDisplay(BaseDisplay):
 
         # Scale display surface
         scaled = pygame.transform.scale(
-            self._display_surface,
+            surface,
             (disp_rect[2], disp_rect[3])
         )
 
