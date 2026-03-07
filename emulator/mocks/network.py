@@ -70,7 +70,7 @@ class WLAN:
                 print(f"[WLAN] Connection to '{ssid}' failed (--no-wifi)")
             self._connected = False
             self._ip = "0.0.0.0"
-            return
+            raise OSError("WiFi connection failed (--no-wifi)")
 
         if state.get("trace"):
             print(f"[WLAN] Connecting to '{ssid}'...")
