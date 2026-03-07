@@ -10,6 +10,11 @@ import asyncio as _asyncio
 from asyncio import *  # noqa: F401,F403
 
 
+async def sleep_ms(ms):
+    """Sleep for given number of milliseconds (MicroPython API)."""
+    await _asyncio.sleep(ms / 1000.0)
+
+
 def get_event_loop():
     """Get the running event loop, creating one if needed.
 

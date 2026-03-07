@@ -63,7 +63,16 @@ class WLAN:
     def connect(self, ssid: str, password: str = "", **kwargs):
         """Connect to WiFi network."""
         self._ssid = ssid
-        if get_state().get("trace"):
+        state = get_state()
+
+        if state.get("no_wifi"):
+            if state.get("trace"):
+                print(f"[WLAN] Connection to '{ssid}' failed (--no-wifi)")
+            self._connected = False
+            self._ip = "0.0.0.0"
+            return
+
+        if state.get("trace"):
             print(f"[WLAN] Connecting to '{ssid}'...")
 
         # Simulate successful connection
@@ -72,7 +81,7 @@ class WLAN:
         self._gateway = "192.168.1.1"
         self._dns = "8.8.8.8"
 
-        if get_state().get("trace"):
+        if state.get("trace"):
             print(f"[WLAN] Connected! IP: {self._ip}")
 
     def disconnect(self):

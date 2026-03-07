@@ -112,6 +112,12 @@ Supported devices: tufty, blinky, presto, badger
         help="Disable slow e-ink refresh animation (instant updates)",
     )
 
+    parser.add_argument(
+        "--no-wifi",
+        action="store_true",
+        help="Simulate WiFi connection failure",
+    )
+
     return parser.parse_args()
 
 
@@ -249,6 +255,7 @@ def main():
     _emulator_state["max_frames"] = args.max_frames
     _emulator_state["app_dir"] = str(app_path.parent.absolute())
     _emulator_state["no_eink_animation"] = args.no_eink_animation
+    _emulator_state["no_wifi"] = args.no_wifi
 
     # Set up memory tracking (before mocks, so tracemalloc captures app allocations)
     memory_tracking = args.memory_tracking or args.strict_memory
