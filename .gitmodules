@@ -18,3 +18,6 @@
 	path = vendor/inky
 	url = https://github.com/pimoroni/inky.git
 	ignore = untracked
+[submodule "vendor/inky-frame"]
+	path = vendor/inky-frame
+	url = https://github.com/pimoroni/inky-frame

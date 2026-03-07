@@ -127,6 +127,18 @@ def _patch_os_uname():
     )
     os.uname = lambda: _fake_uname
 
+    # Patch os.mount/os.umount — MicroPython's os has these but CPython doesn't.
+    # Apps do `import os; os.mount(sd, "/sd")` which fails without this.
+    from emulator.mocks import uos
+    if not hasattr(os, "mount"):
+        os.mount = uos.mount
+    if not hasattr(os, "umount"):
+        os.umount = uos.umount
+    if not hasattr(os, "sync"):
+        os.sync = uos.sync
+    if not hasattr(os, "dupterm"):
+        os.dupterm = uos.dupterm
+
 
 def install_mocks():
     """Install all mock modules into sys.modules."""
