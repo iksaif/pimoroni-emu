@@ -11,7 +11,6 @@ from typing import List, Tuple
 
 from emulator.devices.base import BaseDevice, ButtonConfig
 
-
 # --- Inky pHAT (small, Pi Zero form factor) ---
 
 @dataclass

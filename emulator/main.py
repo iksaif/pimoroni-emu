@@ -12,7 +12,7 @@ import runpy
 from pathlib import Path
 
 from emulator import _emulator_state, get_state
-from emulator.devices import DEVICES, get_device, list_devices
+from emulator.devices import DEVICES, get_device
 from emulator.display import create_display
 from emulator.hardware.buttons import ButtonManager
 from emulator.hardware.sensors import SensorManager
