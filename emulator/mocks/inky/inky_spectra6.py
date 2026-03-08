@@ -1,4 +1,9 @@
-"""Mock for InkyAC073TC1A (7-color 7.3") displays."""
+"""Mock for Spectra 6-color displays (E673, E640, EL133UF1).
+
+Spectra 6 panels have 6 colors with a different index mapping from AC073TC1A/UC8159:
+  BLACK=0, WHITE=1, YELLOW=2, RED=3, BLUE=5, GREEN=6
+Note: index 4 is unused (skipped in the hardware remap).
+"""
 
 from typing import Any, List, Tuple
 
@@ -10,39 +15,33 @@ except ImportError:
     Image = None
 
 
-# Color constants for 7-color display (matches upstream AC073TC1A driver)
+# Color constants for Spectra 6 displays (matches upstream E673/E640/EL133UF1)
 BLACK = 0
 WHITE = 1
-GREEN = 2
-BLUE = 3
-RED = 4
-YELLOW = 5
-ORANGE = 6
+YELLOW = 2
+RED = 3
+BLUE = 5
+GREEN = 6
 CLEAN = 7
 
-# Resolution for 7.3" Spectra
-RESOLUTION = (800, 480)
 
+class InkySpectra6(Inky):
+    """6-color Spectra display (E673 / E640 / EL133UF1).
 
-class InkyAC073TC1A(Inky):
-    """7-color Inky Impression display (AC073TC1A panel).
-
-    Supports 7 colors: black, white, green, blue, red, yellow, orange.
-    Used for older 7.3" (800x480) Inky Impression.
-    Spectra 6 variants (E673, E640, EL133UF1) use InkySpectra6 instead.
+    Supports 6 colors: black, white, yellow, red, blue, green (no orange).
+    Color indices differ from AC073TC1A/UC8159.
     """
 
     # Color constants
     BLACK = BLACK
     WHITE = WHITE
-    GREEN = GREEN
-    BLUE = BLUE
-    RED = RED
     YELLOW = YELLOW
-    ORANGE = ORANGE
+    RED = RED
+    BLUE = BLUE
+    GREEN = GREEN
     CLEAN = CLEAN
 
-    # 7.3" resolution
+    # Default to 7.3" E673 resolution
     WIDTH = 800
     HEIGHT = 480
 
@@ -59,7 +58,7 @@ class InkyAC073TC1A(Inky):
         i2c_bus: Any = None,
         gpio: Any = None,
     ):
-        """Initialize Spectra 6-color 7.3" display.
+        """Initialize Spectra 6-color display.
 
         Args:
             resolution: Display resolution, default (800, 480)
@@ -75,7 +74,7 @@ class InkyAC073TC1A(Inky):
 
         super().__init__(
             resolution=(self.WIDTH, self.HEIGHT),
-            colour="multi",  # 6-color mode
+            colour="multi",
             cs_pin=cs_pin,
             dc_pin=dc_pin,
             reset_pin=reset_pin,
@@ -88,19 +87,23 @@ class InkyAC073TC1A(Inky):
         )
 
     def _get_palette(self) -> List[Tuple[int, int, int]]:
-        """Get the 7-color palette (AC073TC1A)."""
+        """Get the 6-color Spectra palette.
+
+        Note: index 4 is unused in Spectra 6 hardware but included as a
+        gray fallback so palette indexing works for any value 0-6.
+        """
         return [
             (0, 0, 0),        # 0 = Black
             (255, 255, 255),  # 1 = White
-            (0, 128, 0),      # 2 = Green
-            (0, 0, 255),      # 3 = Blue
-            (255, 0, 0),      # 4 = Red
-            (255, 255, 0),    # 5 = Yellow
-            (255, 128, 0),    # 6 = Orange
+            (255, 255, 0),    # 2 = Yellow
+            (255, 0, 0),      # 3 = Red
+            (128, 128, 128),  # 4 = (unused, gray fallback)
+            (0, 0, 255),      # 5 = Blue
+            (0, 128, 0),      # 6 = Green
         ]
 
     def set_image(self, image, saturation: float = 0.5):
-        """Copy an image to the buffer with 7-color quantization.
+        """Copy an image to the buffer with 6-color quantization.
 
         Args:
             image: PIL Image

@@ -10,9 +10,13 @@ from emulator.devices.inky_frame import (
 )
 from emulator.devices.inky_impression import (
     InkyImpression40Device,
+    InkyImpression40SpectraDevice,
     InkyImpression57Device,
     InkyImpression73Device,
+    InkyImpression73SpectraDevice,
     InkyImpression133Device,
+    InkyPHATDevice,
+    InkyWHATDevice,
 )
 from emulator.devices.presto import PrestoDevice
 from emulator.devices.tufty2350 import Tufty2350Device
@@ -34,16 +38,23 @@ DEVICES = {
     "inky_frame_58": InkyFrame58Device,
     "inky_frame_4": InkyFrame40Device,
     "inky_frame_40": InkyFrame40Device,
-    # Inky Impression (Python/inky library on Raspberry Pi)
+    # Inky pHAT/wHAT (Python/inky library on Raspberry Pi, B/W + accent)
+    "inky_phat": InkyPHATDevice,
+    "inky_what": InkyWHATDevice,
+    # Inky Impression (Python/inky library on Raspberry Pi, multi-color)
     "impression": InkyImpression57Device,
     "impression_73": InkyImpression73Device,
+    "impression_73_spectra": InkyImpression73SpectraDevice,
     "impression_57": InkyImpression57Device,
     "impression_40": InkyImpression40Device,
+    "impression_40_spectra": InkyImpression40SpectraDevice,
     "impression_133": InkyImpression133Device,
     "inky_impression": InkyImpression57Device,
     "inky_impression_73": InkyImpression73Device,
+    "inky_impression_73_spectra": InkyImpression73SpectraDevice,
     "inky_impression_57": InkyImpression57Device,
     "inky_impression_40": InkyImpression40Device,
+    "inky_impression_40_spectra": InkyImpression40SpectraDevice,
     "inky_impression_133": InkyImpression133Device,
 }
 

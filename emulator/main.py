@@ -118,6 +118,12 @@ Supported devices: tufty, blinky, presto, badger
         help="Simulate WiFi connection failure",
     )
 
+    parser.add_argument(
+        "--hardware",
+        action="store_true",
+        help="Output to real e-ink hardware (requires: pip install pimoroni-emulator[hardware])",
+    )
+
     return parser.parse_args()
 
 
@@ -240,6 +246,11 @@ def main():
     print(f"  Display: {device.display_width}x{device.display_height} {device.display_type}")
     print(f"  App: {app_path}")
 
+    # Auto-headless when using --hardware without a display server (e.g. RPi over SSH)
+    if args.hardware and not args.headless:
+        if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+            args.headless = True
+
     if args.headless:
         print("  Mode: Headless")
     if args.scale != 1:
@@ -256,6 +267,7 @@ def main():
     _emulator_state["app_dir"] = str(app_path.parent.absolute())
     _emulator_state["no_eink_animation"] = args.no_eink_animation
     _emulator_state["no_wifi"] = args.no_wifi
+    _emulator_state["hardware"] = args.hardware
 
     # Set up memory tracking (before mocks, so tracemalloc captures app allocations)
     memory_tracking = args.memory_tracking or args.strict_memory
@@ -273,12 +285,24 @@ def main():
               (" + 8MB PSRAM" if device.has_psram else "") +
               (" [strict]" if args.strict_memory else ""))
 
+    # Import real inky library BEFORE mocks overwrite sys.modules
+    if args.hardware:
+        try:
+            import inky as _real_inky
+            _emulator_state["real_inky"] = _real_inky
+        except ImportError:
+            print("Error: --hardware requires the inky library", file=sys.stderr)
+            print("  Install with: pip install pimoroni-emulator[hardware]", file=sys.stderr)
+            return 1
+
     # Install mocks based on device type
     library_type = getattr(device, 'library_type', None)
     if library_type == 'inky':
-        # Raspberry Pi device using inky library
+        # Raspberry Pi device using inky library — also install picographics
+        # so MicroPython-style apps (inky_frame, picographics) work too
+        install_mocks()
         install_inky_mocks()
-        print("  Library: inky (Raspberry Pi)")
+        print("  Library: inky + picographics (Raspberry Pi)")
     elif library_type == 'badgeware':
         # Blinky device using badgeware library
         install_badgeware_mocks()
@@ -310,6 +334,12 @@ def main():
 
     # Initialize display
     display.init()
+
+    # Initialize real e-ink hardware output
+    if args.hardware:
+        if hasattr(display, 'init_hardware'):
+            display.init_hardware()
+        print("  Hardware: enabled (real e-ink output)")
 
     # Set up hardware managers
     button_manager = ButtonManager(device)

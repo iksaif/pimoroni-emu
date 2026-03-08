@@ -11,14 +11,14 @@ class InkyFrame73Device(BaseDevice):
     """Inky Frame 7.3" - RP2350-based e-ink display with PicoGraphics."""
 
     name: str = "Inky Frame 7.3\""
-    description: str = "7.3\" e-ink (800x480, 6 colors) with RP2350 Pico 2 W"
+    description: str = "7.3\" e-ink (800x480, 7 colors) with RP2350 Pico 2 W"
 
-    # Display: 800x480 Spectra 6 e-ink
+    # Display: 800x480 7-color e-ink (AC073TC1A)
     display_width: int = 800
     display_height: int = 480
     display_type: str = "eink_color"
     display_scale: int = 1
-    color_depth: int = 4  # 6 colors = ~2.5 bits, use 4-bit palette
+    color_depth: int = 4  # 7 colors, use 4-bit palette
     is_color: bool = True
 
     # 5 buttons with LED indicators
@@ -58,7 +58,7 @@ class InkyFrame73Device(BaseDevice):
 
     # E-ink specific
     is_eink: bool = True
-    eink_colors: int = 6  # Spectra 6: black, white, red, yellow, blue, green
+    eink_colors: int = 7  # 7-color: black, white, green, blue, red, yellow, orange
     eink_refresh_time_ms: int = 20000  # ~20 seconds
 
     def get_window_size(self) -> Tuple[int, int]:

@@ -37,6 +37,9 @@ dev = [
     "pytest>=7.4.0",
     "numpy>=1.24.0",
 ]
+hardware = [
+    "inky>=2.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/iksaif/pimoroni-emu"

@@ -4,6 +4,8 @@ import threading
 import time as _time
 from typing import List, Tuple
 
+from PIL import Image
+
 from emulator import get_state
 from emulator.display.base import BaseDisplay, draw_memory_bar
 
@@ -18,11 +20,9 @@ def _init_pygame():
         pygame = pg
 
 
-# Color e-ink palettes (pen index order matches upstream C++ enum:
-# BLACK=0, WHITE=1, GREEN=2, BLUE=3, RED=4, YELLOW=5, ORANGE=6, TAUPE/CLEAN=7)
-
-# Spectra 6 colors (Inky Frame 7.3")
-SPECTRA_6_PALETTE = [
+# 7-color ACeP palette (AC073TC1A / UC8159)
+# Pen index order: BLACK=0, WHITE=1, GREEN=2, BLUE=3, RED=4, YELLOW=5, ORANGE=6, CLEAN=7
+ACEP_7_PALETTE = [
     (0, 0, 0),        # 0 Black
     (255, 255, 255),  # 1 White
     (0, 128, 0),      # 2 Green
@@ -33,16 +33,16 @@ SPECTRA_6_PALETTE = [
     (180, 160, 140),  # 7 Taupe / Clean
 ]
 
-# ACeP 7 colors (Inky Frame 4.0", 5.8")
-ACEP_7_PALETTE = [
+# 6-color Spectra palette (E673 / E640 / EL133UF1)
+# Pen index order: BLACK=0, WHITE=1, YELLOW=2, RED=3, (unused)=4, BLUE=5, GREEN=6
+SPECTRA_6_PALETTE = [
     (0, 0, 0),        # 0 Black
     (255, 255, 255),  # 1 White
-    (0, 128, 0),      # 2 Green
-    (0, 0, 255),      # 3 Blue
-    (255, 0, 0),      # 4 Red
-    (255, 255, 0),    # 5 Yellow
-    (255, 128, 0),    # 6 Orange
-    (180, 160, 140),  # 7 Taupe / Clean
+    (255, 255, 0),    # 2 Yellow
+    (255, 0, 0),      # 3 Red
+    (128, 128, 128),  # 4 (unused index, gray fallback)
+    (0, 0, 255),      # 5 Blue
+    (0, 128, 0),      # 6 Green
 ]
 
 
@@ -80,15 +80,18 @@ class EInkDisplay(BaseDisplay):
         # E-ink dithering pattern
         self._dither = True
 
+        # Real hardware output
+        self._hw_device = None
+
         # Color e-ink support
         self._is_color = getattr(device, 'is_color', False)
         self._eink_colors = getattr(device, 'eink_colors', 2)
 
-        # Select palette based on device
-        if self._eink_colors == 6:
-            self._palette = SPECTRA_6_PALETTE
-        elif self._eink_colors == 7:
+        # Select palette based on device color capability
+        if self._eink_colors >= 7:
             self._palette = ACEP_7_PALETTE
+        elif self._eink_colors >= 6:
+            self._palette = SPECTRA_6_PALETTE
         else:
             self._palette = [(0, 0, 0), (255, 255, 255)]  # B&W
 
@@ -177,6 +180,8 @@ class EInkDisplay(BaseDisplay):
             if self._display_surface:
                 self._convert_buffer(buffer)
             self._autosave_frame()
+            if self._hw_device:
+                self._push_to_hardware(buffer)
             return
 
         if not self._display_surface:
@@ -192,6 +197,8 @@ class EInkDisplay(BaseDisplay):
             with self._render_lock:
                 self._ready_surface = new_surface.copy()
             self._autosave_frame()
+            if self._hw_device:
+                self._push_to_hardware(buffer)
             return
 
         # Save previous frame for transition
@@ -245,6 +252,10 @@ class EInkDisplay(BaseDisplay):
 
         # Autosave if enabled
         self._autosave_frame()
+
+        # Push to real e-ink hardware
+        if self._hw_device:
+            self._push_to_hardware(buffer)
 
     def _draw_window(self):
         """Draw the full emulator window (called from main thread)."""
@@ -454,6 +465,44 @@ class EInkDisplay(BaseDisplay):
     def set_refresh_speed(self, duration: float):
         """Set refresh animation duration in seconds."""
         self._refresh_duration = max(0.1, min(2.0, duration))
+
+    def init_hardware(self):
+        """Detect and initialize real e-ink HAT for hardware output."""
+        state = get_state()
+        real_inky = state.get("real_inky")
+        if not real_inky:
+            return
+        try:
+            self._hw_device = real_inky.auto(ask_user=True, verbose=True)
+            print(f"[Hardware] Detected: {type(self._hw_device).__name__} "
+                  f"{self._hw_device.width}x{self._hw_device.height}")
+        except Exception as e:
+            print(f"[Hardware] Failed to detect e-ink HAT: {e}")
+
+    def _push_to_hardware(self, buffer):
+        """Send framebuffer to real e-ink hardware.
+
+        Uses BaseDisplay._buffer_to_image (clean RGB, no dithering/tinting)
+        because the real inky library handles palette quantization itself.
+        """
+        try:
+            # Get clean RGB image via the base class (not the EInk override
+            # which applies emulator-specific dithering and paper tinting)
+            image = BaseDisplay._buffer_to_image(self, buffer)
+
+            # Resize if emulated resolution differs from hardware
+            hw_w, hw_h = self._hw_device.width, self._hw_device.height
+            if image.size != (hw_w, hw_h):
+                image = image.resize((hw_w, hw_h), Image.LANCZOS)
+
+            self._hw_device.set_border(self._hw_device.BLACK)
+            self._hw_device.set_image(image, saturation=0.5)
+            self._hw_device.show()
+
+            if get_state().get("trace"):
+                print("[Hardware] Frame pushed to e-ink HAT")
+        except Exception as e:
+            print(f"[Hardware] Error pushing frame: {e}")
 
     def _buffer_to_image(self, buffer):
         """Convert e-ink framebuffer to PIL Image.

@@ -303,7 +303,12 @@ def install_inky_mocks():
 
     This is separate from MicroPython mocks since Inky uses regular Python
     and runs on Raspberry Pi (not RP2040/RP2350).
+
+    Registers all upstream submodules so imports like
+    `from inky.inky_uc8159 import Inky` or `from inky.phat import InkyPHAT` work.
     """
+    import types
+
     from emulator.mocks import inky
     from emulator.mocks.inky import auto as inky_auto
 
@@ -312,6 +317,43 @@ def install_inky_mocks():
     sys.modules["inky.inky"] = inky.inky
     sys.modules["inky.inky_uc8159"] = inky.inky_uc8159
     sys.modules["inky.inky_ac073tc1a"] = inky.inky_ac073tc1a
+    sys.modules["inky.inky_spectra6"] = inky.inky_spectra6
+
+    # Alias modules for driver-specific imports that upstream provides
+    # (e.g. `from inky.inky_e673 import Inky as InkyE673`)
+    # These all map to our existing mock classes.
+    _alias_modules = {
+        "inky.inky_e673": ("InkyE673", inky.InkyE673),
+        "inky.inky_e640": ("InkyE640", inky.InkyE640),
+        "inky.inky_el133uf1": ("InkyEL133UF1", inky.InkyEL133UF1),
+        "inky.inky_ssd1683": ("InkyWHAT_SSD1683", inky.InkyWHAT_SSD1683),
+        "inky.inky_jd79661": ("InkyJD79661", inky.InkyJD79661),
+        "inky.inky_jd79668": ("InkyJD79668", inky.InkyJD79668),
+    }
+    for mod_name, (cls_name, cls) in _alias_modules.items():
+        mod = types.ModuleType(mod_name)
+        mod.Inky = cls  # upstream convention: each driver exports `Inky`
+        setattr(mod, cls_name, cls)
+        sys.modules[mod_name] = mod
+
+    # phat/what submodules (upstream uses `from inky.phat import InkyPHAT`)
+    phat_mod = types.ModuleType("inky.phat")
+    phat_mod.InkyPHAT = inky.InkyPHAT
+    phat_mod.InkyPHAT_SSD1608 = inky.InkyPHAT_SSD1608
+    sys.modules["inky.phat"] = phat_mod
+
+    what_mod = types.ModuleType("inky.what")
+    what_mod.InkyWHAT = inky.InkyWHAT
+    sys.modules["inky.what"] = what_mod
+
+    # eeprom module (some apps import it for display variant info)
+    eeprom_mod = types.ModuleType("inky.eeprom")
+    eeprom_mod.read_eeprom = lambda i2c_bus=None: None
+    sys.modules["inky.eeprom"] = eeprom_mod
+
+    # mock module (upstream simulation support)
+    mock_mod = types.ModuleType("inky.mock")
+    sys.modules["inky.mock"] = mock_mod
 
 
 def install_badgeware_mocks():
