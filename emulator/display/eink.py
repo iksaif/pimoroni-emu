@@ -407,7 +407,12 @@ class EInkDisplay(BaseDisplay):
                 self._window.blit(label, (win_w - 42, win_h - 34))
 
     def tick(self):
-        """Redraw if device status changed (sleep/reset/off)."""
+        """Redraw window when new frames are available or status changes."""
+        # Always redraw — the render thread publishes to _ready_surface
+        # and the animation runs at ~60fps during refresh
+        if self._ready_surface:
+            self._draw_window()
+
         status = get_state().get("device_status")
         if status and status != getattr(self, '_last_status', None):
             self._last_status = status

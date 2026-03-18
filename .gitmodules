@@ -21,3 +21,6 @@
 [submodule "vendor/inky-frame"]
 	path = vendor/inky-frame
 	url = https://github.com/pimoroni/inky-frame
+[submodule "vendor/tufty2350"]
+	path = vendor/tufty2350
+	url = https://github.com/pimoroni/tufty2350.git

@@ -89,7 +89,7 @@ def init(disp, prest, w, h, year, month, day):
     IS_EINK = w > 400 and h > 200 and presto is None
     layout = Layout(w, h)
 
-    if DARK_THEME:
+    if DARK_THEME and not IS_EINK:
         BG = display.create_pen(15, 12, 30)
         TEXT = display.create_pen(230, 230, 230)
         DIM = display.create_pen(60, 50, 80)
