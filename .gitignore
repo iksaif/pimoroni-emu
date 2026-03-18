@@ -30,3 +30,10 @@ env/
 checklist.txt
 .claude/
 tests/output/
+
+# Runtime caches
+day_cache.json
+icon_cache/
+icons/*.png
+state.json
+state.json~

@@ -11,6 +11,33 @@ from emulator import get_state
 # ASCII grayscale ramp (darkest to brightest)
 ASCII_RAMP = " .:-=+*#%@"
 
+# Font cache for safe_font()
+_font_cache: dict = {}
+
+
+def safe_font(pg, name: str = "monospace", size: int = 14, bold: bool = False):
+    """Get a pygame font, falling back gracefully on broken font modules (Python 3.14+).
+
+    Returns None if no font backend is available.
+    """
+    key = (name, size, bold)
+    cached = _font_cache.get(key)
+    if cached is not None:
+        return cached
+
+    font = None
+    try:
+        font = pg.font.SysFont(name, size, bold=bold)
+    except (NotImplementedError, ImportError, AttributeError):
+        try:
+            # Fallback: use pygame's default font
+            font = pg.font.Font(None, size)
+        except (NotImplementedError, ImportError, AttributeError):
+            pass
+
+    _font_cache[key] = font
+    return font
+
 
 class BaseDisplay(ABC):
     """Base class for display renderers."""
@@ -226,6 +253,7 @@ def draw_memory_bar(pg, surface, x: int, y: int, width: int, used: int, total: i
     used_kb = used / 1024
     total_kb = total / 1024
     label = f"Heap: {used_kb:.0f}/{total_kb:.0f}KB"
-    font = pg.font.SysFont("monospace", 10)
-    text = font.render(label, True, (180, 180, 180))
-    surface.blit(text, (x, y + bar_height + 1))
+    font = safe_font(pg, "monospace", 10)
+    if font:
+        text = font.render(label, True, (180, 180, 180))
+        surface.blit(text, (x, y + bar_height + 1))

@@ -5,7 +5,7 @@ import threading
 from typing import List
 
 from emulator import get_state
-from emulator.display.base import BaseDisplay, draw_memory_bar
+from emulator.display.base import BaseDisplay, draw_memory_bar, safe_font
 
 # Lazy import pygame
 pygame = None
@@ -215,7 +215,9 @@ class LEDMatrixDisplay(BaseDisplay):
 
     def _draw_status_bar(self):
         """Draw status bar."""
-        font = pygame.font.SysFont("monospace", 14)
+        font = safe_font(pygame, "monospace", 14)
+        if not font:
+            return
 
         # Device name
         text = font.render(f"{self.device.name}", True, (200, 200, 200))
@@ -240,7 +242,7 @@ class LEDMatrixDisplay(BaseDisplay):
             return
 
         win_h = self._window.get_height()
-        font = pygame.font.SysFont("monospace", 12)
+        font = safe_font(pygame, "monospace", 12)
 
         x = 10
         for btn_config in self.device.buttons:
@@ -255,9 +257,10 @@ class LEDMatrixDisplay(BaseDisplay):
                 border_radius=3
             )
 
-            text = font.render(btn_config.name, True, (255, 255, 255))
-            text_rect = text.get_rect(center=(x + 20, win_h - 20))
-            self._window.blit(text, text_rect)
+            if font:
+                text = font.render(btn_config.name, True, (255, 255, 255))
+                text_rect = text.get_rect(center=(x + 20, win_h - 20))
+                self._window.blit(text, text_rect)
 
             x += 50
 
@@ -343,7 +346,7 @@ class LEDMatrixDisplay(BaseDisplay):
 
         from emulator.mocks.qwstpad import KEY_TO_BUTTON
 
-        font = pygame.font.SysFont("monospace", 13, bold=True)
+        font = safe_font(pygame, "monospace", 13, bold=True)
 
         for key_name, rect, label in layout:
             x, y, w, h = rect
@@ -360,9 +363,10 @@ class LEDMatrixDisplay(BaseDisplay):
             pygame.draw.rect(self._window, bg_color, (x, y, w, h), border_radius=4)
             pygame.draw.rect(self._window, (90, 90, 95), (x, y, w, h), 1, border_radius=4)
 
-            text = font.render(label, True, text_color)
-            text_rect = text.get_rect(center=(x + w // 2, y + h // 2))
-            self._window.blit(text, text_rect)
+            if font:
+                text = font.render(label, True, text_color)
+                text_rect = text.get_rect(center=(x + w // 2, y + h // 2))
+                self._window.blit(text, text_rect)
 
         # LED indicators
         if qwstpad:

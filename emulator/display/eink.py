@@ -7,7 +7,7 @@ from typing import List, Tuple
 from PIL import Image
 
 from emulator import get_state
-from emulator.display.base import BaseDisplay, draw_memory_bar
+from emulator.display.base import BaseDisplay, draw_memory_bar, safe_font
 
 # Lazy import pygame
 pygame = None
@@ -305,7 +305,9 @@ class EInkDisplay(BaseDisplay):
 
     def _draw_status_bar(self):
         """Draw status bar."""
-        font = pygame.font.SysFont("monospace", 14)
+        font = safe_font(pygame, "monospace", 14)
+        if not font:
+            return
 
         # Device name
         text = font.render(f"{self.device.name}", True, (60, 60, 60))
@@ -336,7 +338,7 @@ class EInkDisplay(BaseDisplay):
         if not self.device.buttons:
             return
 
-        font = pygame.font.SysFont("monospace", 12)
+        font = safe_font(pygame, "monospace", 12)
         has_button_leds = getattr(self.device, 'has_button_leds', False)
 
         if has_button_leds:
@@ -360,9 +362,10 @@ class EInkDisplay(BaseDisplay):
                     (btn_x, btn_y - 10, 24, 20),
                     border_radius=3,
                 )
-                text = font.render(btn_config.name, True, (255, 255, 255))
-                text_rect = text.get_rect(center=(btn_x + 12, btn_y))
-                self._window.blit(text, text_rect)
+                if font:
+                    text = font.render(btn_config.name, True, (255, 255, 255))
+                    text_rect = text.get_rect(center=(btn_x + 12, btn_y))
+                    self._window.blit(text, text_rect)
 
                 # LED dot to the left of button
                 led_key = f"button_{btn_config.name.lower()}_led"
@@ -384,9 +387,10 @@ class EInkDisplay(BaseDisplay):
                     (x, win_h - 30, 40, 20),
                     border_radius=3,
                 )
-                text = font.render(btn_config.name, True, (255, 255, 255))
-                text_rect = text.get_rect(center=(x + 20, win_h - 20))
-                self._window.blit(text, text_rect)
+                if font:
+                    text = font.render(btn_config.name, True, (255, 255, 255))
+                    text_rect = text.get_rect(center=(x + 20, win_h - 20))
+                    self._window.blit(text, text_rect)
                 x += 50
 
         # Draw busy/activity LED
@@ -397,9 +401,10 @@ class EInkDisplay(BaseDisplay):
             win_w = self.device.get_window_size()[0]
             win_h = self.device.get_window_size()[1]
             pygame.draw.circle(self._window, busy_color, (win_w - 20, win_h - 20), 6)
-            font_sm = pygame.font.SysFont("monospace", 10)
-            label = font_sm.render("BUSY", True, (120, 120, 120))
-            self._window.blit(label, (win_w - 42, win_h - 34))
+            font_sm = safe_font(pygame, "monospace", 10)
+            if font_sm:
+                label = font_sm.render("BUSY", True, (120, 120, 120))
+                self._window.blit(label, (win_w - 42, win_h - 34))
 
     def tick(self):
         """Redraw if device status changed (sleep/reset/off)."""

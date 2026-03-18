@@ -7,6 +7,7 @@ The panel auto-discovers sensors and only shows when sensors are used.
 from typing import Callable, List, Optional, Tuple
 
 from emulator import get_state
+from emulator.display.base import safe_font
 
 try:
     import pygame
@@ -110,13 +111,14 @@ class Slider:
         pygame.draw.circle(surface, thumb_color, (thumb_x, track_y + 2), 6)
 
         # Label and value text
-        font = pygame.font.SysFont("monospace", 10)
-        label_surf = font.render(self.label, True, self.label_color)
-        value_str = self.format_str.format(self._value)
-        value_surf = font.render(value_str, True, self.text_color)
+        font = safe_font(pygame, "monospace", 10)
+        if font:
+            label_surf = font.render(self.label, True, self.label_color)
+            value_str = self.format_str.format(self._value)
+            value_surf = font.render(value_str, True, self.text_color)
 
-        surface.blit(label_surf, (self.x + 5, self.y + 2))
-        surface.blit(value_surf, (self.x + self.width - value_surf.get_width() - 5, self.y + 2))
+            surface.blit(label_surf, (self.x + 5, self.y + 2))
+            surface.blit(value_surf, (self.x + self.width - value_surf.get_width() - 5, self.y + 2))
 
 
 class SensorControl:
@@ -371,10 +373,11 @@ class SensorPanel:
         # Header
         header_color = (60, 60, 65) if self._dragging else self.header_color
         pygame.draw.rect(surface, header_color, (self.x, self.y, self.width, 20))
-        font = pygame.font.SysFont("monospace", 11)
-        arrow = ">" if self.collapsed else "v"
-        title = font.render(f"{arrow} Sensors", True, self.title_color)
-        surface.blit(title, (self.x + 5, self.y + 3))
+        font = safe_font(pygame, "monospace", 11)
+        if font:
+            arrow = ">" if self.collapsed else "v"
+            title = font.render(f"{arrow} Sensors", True, self.title_color)
+            surface.blit(title, (self.x + 5, self.y + 3))
 
         # Drag handle dots (right side of header)
         grip_x = self.x + self.width - 14
@@ -389,12 +392,13 @@ class SensorPanel:
 
         # Render each sensor control
         current_y = self.y + 25
-        name_font = pygame.font.SysFont("monospace", 10)
+        name_font = safe_font(pygame, "monospace", 10)
 
         for ctrl in self.active_controls:
             # Sensor name
-            name_surf = name_font.render(ctrl.name, True, self.text_color)
-            surface.blit(name_surf, (self.x + 5, current_y))
+            if name_font:
+                name_surf = name_font.render(ctrl.name, True, self.text_color)
+                surface.blit(name_surf, (self.x + 5, current_y))
             current_y += 18
 
             # Sliders
