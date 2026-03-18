@@ -1,5 +1,6 @@
 """Base display renderer class."""
 
+import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -26,14 +27,16 @@ def safe_font(pg, name: str = "monospace", size: int = 14, bold: bool = False):
         return cached
 
     font = None
-    try:
-        font = pg.font.SysFont(name, size, bold=bold)
-    except (NotImplementedError, ImportError, AttributeError):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
         try:
-            # Fallback: use pygame's default font
-            font = pg.font.Font(None, size)
+            font = pg.font.SysFont(name, size, bold=bold)
         except (NotImplementedError, ImportError, AttributeError):
-            pass
+            try:
+                # Fallback: use pygame's default font
+                font = pg.font.Font(None, size)
+            except (NotImplementedError, ImportError, AttributeError):
+                pass
 
     _font_cache[key] = font
     return font

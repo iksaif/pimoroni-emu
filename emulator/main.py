@@ -297,10 +297,11 @@ def main():
 
     # Install mocks based on device type
     library_type = getattr(device, 'library_type', None)
+    _dev_name = getattr(device, 'name', device_name or '')
     if library_type == 'inky':
         # Raspberry Pi device using inky library — also install picographics
         # so MicroPython-style apps (inky_frame, picographics) work too
-        install_mocks()
+        install_mocks(device_name=_dev_name)
         install_inky_mocks()
         print("  Library: inky + picographics (Raspberry Pi)")
     elif library_type == 'badgeware':
@@ -309,7 +310,7 @@ def main():
         print("  Library: badgeware (Blinky)")
     else:
         # MicroPython device using picographics
-        install_mocks()
+        install_mocks(device_name=_dev_name)
         print("  Library: picographics (MicroPython)")
 
     # Set up virtual filesystem for badger apps

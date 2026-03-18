@@ -156,8 +156,14 @@ def _patch_os_uname():
     builtins.open = _vfs_open
 
 
-def install_mocks():
-    """Install all mock modules into sys.modules."""
+def install_mocks(device_name=None):
+    """Install all mock modules into sys.modules.
+
+    Args:
+        device_name: If set, only install mocks relevant to this device.
+                     Device-specific modules (presto, tufty2350, etc.) are
+                     only installed if they match the device.
+    """
     # Import base module (provides trace_log and base classes)
     # Import mocks and register them
     # Hardware sensor mocks
@@ -246,14 +252,20 @@ def install_mocks():
     sys.modules["usocket"] = mock_socket
     sys.modules["jpegdec"] = jpegdec
 
-    # Device-specific modules
-    sys.modules["presto"] = presto
-    sys.modules["tufty2350"] = tufty2350
-    sys.modules["touch"] = touch
-    sys.modules["inky_frame"] = inky_frame
+    # Device-specific modules — only install if matching the target device
+    # (or if no device specified, install all for backwards compat)
+    _dn = (device_name or "").lower()
+    if not _dn or "presto" in _dn:
+        sys.modules["presto"] = presto
+        sys.modules["touch"] = touch
+    if not _dn or "tufty" in _dn:
+        sys.modules["tufty2350"] = tufty2350
+    if not _dn or "inky" in _dn:
+        sys.modules["inky_frame"] = inky_frame
+    if not _dn or "badger" in _dn:
+        sys.modules["badger2040"] = badger2040
+        sys.modules["badger_os"] = badger_os
     sys.modules["picovector"] = picovector
-    sys.modules["badger2040"] = badger2040
-    sys.modules["badger_os"] = badger_os
     sys.modules["pngdec"] = pngdec
     sys.modules["uos"] = uos
     sys.modules["ntptime"] = ntptime

@@ -1,15 +1,15 @@
 """On This Day — today's date and a historical event from Wikipedia.
 
-Fetches curated events from Wikipedia's "On This Day" API and cycles
-through them. Touch the screen (Presto) or wait to see the next event.
-Filters out violent/war content to keep it kid-friendly.
+Fetches curated events and notable births from Wikipedia's "On This Day" API
+and cycles through them. Touch the screen (Presto) or wait to see the next event.
 
 Optionally uses a free AI API (Groq, Gemini, or Mistral) to reformulate
-events for young children and add emojis.
+events for children and pick emojis (rendered via Twemoji PNGs).
 
-Works on Presto (primary) and other PicoGraphics devices (Tufty, Inky Frame,
-Badger). For non-Presto devices, change the fallback import below.
+Features: daily cache, SD card support, night dimming, sleep on inactivity,
+WiFi retry, crash screen, .env config.
 
+Works on Presto (primary) and other PicoGraphics devices.
 Run: python -m emulator --device presto apps/presto/on_this_day.py
 """
 
@@ -27,7 +27,6 @@ try:
                 _env[_k.strip()] = _v.strip()
 except OSError:
     pass
-# Also check os.environ on desktop (MicroPython doesn't have it)
 try:
     import os
     for _k in ("WIFI_SSID", "WIFI_PASSWORD", "AI_PROVIDER", "AI_API_KEY", "AI_MODEL"):
@@ -38,28 +37,33 @@ except (ImportError, AttributeError):
     pass
 
 # ─── Configuration ───────────────────────────────────────────────
-# Values are read from .env file, os.environ, or defaults below.
-# On real hardware, create a .env file on the device with your settings.
-LANGUAGE = "fr"                                       # Wikipedia language
-WIFI_SSID = _env.get("WIFI_SSID", "")                # WiFi SSID
-WIFI_PASSWORD = _env.get("WIFI_PASSWORD", "")         # WiFi password
-UTC_OFFSET_WINTER = 1                                 # UTC offset (CET = 1)
-UTC_OFFSET_SUMMER = 2                                 # UTC offset (CEST = 2)
-EVENT_CATEGORY = "selected"                           # selected, events, births, deaths
-AUTO_CYCLE_SECS = 15                                  # Auto-cycle interval
-KID_FRIENDLY = True                                   # Filter violent content
-DARK_THEME = True                                     # True for TFT, False for e-ink
+LANGUAGE = "fr"
+WIFI_SSID = _env.get("WIFI_SSID", "")
+WIFI_PASSWORD = _env.get("WIFI_PASSWORD", "")
+UTC_OFFSET_WINTER = 1
+UTC_OFFSET_SUMMER = 2
+AUTO_CYCLE_SECS = 30
+DARK_THEME = True
 
-# AI reformulation (optional — needs API key in .env)
-# Supported: "groq", "gemini", "mistral"
+# AI reformulation
 AI_PROVIDER = _env.get("AI_PROVIDER", "groq")
 AI_API_KEY = _env.get("AI_API_KEY", "")
 AI_MODEL = _env.get("AI_MODEL", "")
-KID_AGE = 10                                          # Target age
-SKIP_BOOT = _env.get("SKIP_BOOT", "") != ""           # Skip WiFi/NTP/fetch (use cache only)
+KID_AGE = 10
+
+# Night dimming (24h format, local time)
+DIM_HOUR_START = 20   # dim after 20:00
+DIM_HOUR_END = 7      # bright after 07:00
+DIM_BRIGHTNESS = 0.15
+NORMAL_BRIGHTNESS = 1.0
+
+# Sleep on inactivity
+SLEEP_AFTER_SECS = 300  # dim to sleep after 5min of no touch
+SLEEP_BRIGHTNESS = 0.02
+
+SKIP_BOOT = _env.get("SKIP_BOOT", "") != ""
 # ─────────────────────────────────────────────────────────────────
 
-# Provider defaults
 _AI_DEFAULTS = {
     "groq": {
         "url": "https://api.groq.com/openai/v1/chat/completions",
@@ -75,23 +79,6 @@ _AI_DEFAULTS = {
     },
 }
 
-# Keywords to filter out when KID_FRIENDLY is True (lowercase, multi-language)
-_BLOCKLIST = [
-    # English
-    "war", "massacre", "assassin", "murder", "genocide", "terrorist",
-    "terrorism", "bombing", "execution", "killed", "killing", "attack",
-    "shooting", "slaughter", "torture", "holocaust",
-    # French
-    "guerre", "massacre", "assassin", "meurtre", "genocide", "terroris",
-    "attentat", "execution", "bombe", "tuer", "tuerie", "fusill",
-    "torture",
-    # German
-    "krieg", "mord", "anschlag", "hinrichtung", "massaker",
-    # Spanish
-    "guerra", "asesin", "masacre", "atentado", "ejecucion",
-]
-
-# Month names by language
 _MONTHS = {
     "fr": ["janvier", "fevrier", "mars", "avril", "mai", "juin",
            "juillet", "aout", "septembre", "octobre", "novembre", "decembre"],
@@ -107,55 +94,36 @@ _MONTHS = {
            "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"],
 }
 
-# "X years ago" format by language
 _AGO_FMT = {
-    "fr": "il y a {} ans",
-    "en": "{} years ago",
-    "de": "vor {} Jahren",
-    "es": "hace {} anos",
-    "it": "{} anni fa",
-    "pt": "ha {} anos",
+    "fr": "il y a {} ans", "en": "{} years ago", "de": "vor {} Jahren",
+    "es": "hace {} anos", "it": "{} anni fa", "pt": "ha {} anos",
 }
 
-# UI strings by language
 _STRINGS = {
     "fr": {
         "title": "Ce jour dans l'histoire",
-        "wifi_connect": "WiFi",
-        "wifi_ok": "WiFi OK !",
-        "wifi_fail": "WiFi echoue",
-        "no_wifi_cfg": "WiFi non configure",
-        "time_sync": "Heure",
-        "time_ok": "Heure OK !",
+        "wifi_connect": "WiFi", "wifi_ok": "WiFi OK !",
+        "wifi_fail": "WiFi echoue", "no_wifi_cfg": "WiFi non configure",
+        "time_sync": "Heure", "time_ok": "Heure OK !",
         "time_fail": "Pas d'heure",
-        "fetch": "Chargement",
-        "fetch_ok": "Pret !",
-        "fetch_fail": "Erreur chargement",
-        "no_events": "Aucun evenement",
-        "network_err": "Erreur reseau",
-        "ready": "C'est parti !",
-        "ai_rewrite": "Simplification",
+        "fetch": "Chargement", "fetch_fail": "Erreur chargement",
+        "no_events": "Aucun evenement", "network_err": "Erreur reseau",
+        "ready": "C'est parti !", "ai_rewrite": "Simplification",
+        "born": "Naissance de",
     },
     "en": {
         "title": "On This Day",
-        "wifi_connect": "WiFi",
-        "wifi_ok": "WiFi OK!",
-        "wifi_fail": "WiFi failed",
-        "no_wifi_cfg": "WiFi not set",
-        "time_sync": "Time sync",
-        "time_ok": "Time OK!",
+        "wifi_connect": "WiFi", "wifi_ok": "WiFi OK!",
+        "wifi_fail": "WiFi failed", "no_wifi_cfg": "WiFi not set",
+        "time_sync": "Time sync", "time_ok": "Time OK!",
         "time_fail": "No time source",
-        "fetch": "Fetching",
-        "fetch_ok": "Ready!",
-        "fetch_fail": "Fetch failed",
-        "no_events": "No events found",
-        "network_err": "Network error",
-        "ready": "Ready!",
-        "ai_rewrite": "Simplifying",
+        "fetch": "Fetching", "fetch_fail": "Fetch failed",
+        "no_events": "No events found", "network_err": "Network error",
+        "ready": "Ready!", "ai_rewrite": "Simplifying",
+        "born": "Born:",
     },
 }
 
-# Language names for AI prompt
 _LANG_NAMES = {
     "fr": "French", "en": "English", "de": "German",
     "es": "Spanish", "it": "Italian", "pt": "Portuguese",
@@ -167,24 +135,19 @@ def _s(key):
     return strings.get(key, _STRINGS.get("en", {}).get(key, key))
 
 
-def _month_name(month_1indexed):
-    months = _MONTHS.get(LANGUAGE, _MONTHS.get("en"))
-    return months[month_1indexed - 1]
+def _month_name(m):
+    return _MONTHS.get(LANGUAGE, _MONTHS.get("en"))[m - 1]
 
 
-def _years_ago_str(years):
-    fmt = _AGO_FMT.get(LANGUAGE, _AGO_FMT["en"])
-    return fmt.format(years)
+def _years_ago_str(y):
+    return _AGO_FMT.get(LANGUAGE, _AGO_FMT["en"]).format(y)
 
 
-def _is_kid_safe(text):
-    if not KID_FRIENDLY:
-        return True
-    lower = text.lower()
-    for word in _BLOCKLIST:
-        if word in lower:
-            return False
-    return True
+def _capitalize(text):
+    """Capitalize first letter (Wikipedia FR events start lowercase)."""
+    if text and text[0].islower():
+        return text[0].upper() + text[1:]
+    return text
 
 
 # ─── Device init ─────────────────────────────────────────────────
@@ -194,14 +157,51 @@ try:
     presto = Presto(full_res=True)
     display = presto.display
 except ImportError:
-    from picographics import PicoGraphics, DISPLAY_TUFTY_2350
-    display = PicoGraphics(display=DISPLAY_TUFTY_2350)
+    # Not a Presto — use PicoGraphics with auto-detection.
+    # On real hardware, pass the correct DISPLAY_* constant for your board.
+    # The emulator auto-detects from --device flag.
+    from picographics import PicoGraphics
+    display = PicoGraphics()
 
 WIDTH, HEIGHT = display.get_bounds()
 
+# ─── Device capabilities ─────────────────────────────────────────
+HAS_TOUCH = presto is not None
+IS_EINK = WIDTH > 400 and HEIGHT > 200 and presto is None
+IS_SMALL = WIDTH < 320 or HEIGHT < 200   # Badger (296x128)
+IS_MEDIUM = not IS_SMALL and (WIDTH < 480 or HEIGHT < 300)  # Tufty (320x240)
+
+# Adaptive scales based on resolution
+if IS_SMALL:
+    _S_TITLE = 2
+    _S_YEAR = 2
+    _S_NAME = 1
+    _S_BODY_BIG = 2
+    _S_BODY_SM = 1
+    _S_AGO = 1
+    _S_BOOT_TITLE = 2
+    _S_BOOT_MSG = 1
+elif IS_MEDIUM:
+    _S_TITLE = 2
+    _S_YEAR = 2
+    _S_NAME = 1
+    _S_BODY_BIG = 2
+    _S_BODY_SM = 1
+    _S_AGO = 1
+    _S_BOOT_TITLE = 2
+    _S_BOOT_MSG = 2
+else:  # Large: Presto (480x480), Inky Frame (800x480)
+    _S_TITLE = 4
+    _S_YEAR = 4
+    _S_NAME = 2
+    _S_BODY_BIG = 3
+    _S_BODY_SM = 2
+    _S_AGO = 2
+    _S_BOOT_TITLE = 4
+    _S_BOOT_MSG = 3
+
 
 def _show_crash(err_type, err_msg):
-    """Show an error on screen. Works even if theme/fonts aren't set up yet."""
     try:
         import sys
         sys.print_exception(err_type) if isinstance(err_type, BaseException) else None
@@ -216,10 +216,9 @@ def _show_crash(err_type, err_msg):
         display.set_pen(red)
         display.text("CRASH", 20, 20, -1, scale=4, spacing=1)
         display.set_pen(white)
-        # Word-wrap the error message manually
         msg = str(err_msg)
         y = 70
-        chunk = 40  # chars per line at scale=2
+        chunk = 40
         for i in range(0, len(msg), chunk):
             if y > HEIGHT - 30:
                 break
@@ -231,12 +230,11 @@ def _show_crash(err_type, err_msg):
             display.update()
     except Exception:
         pass
-    # Stay on crash screen
     while True:
         time.sleep(1)
 
 
-# ─── HSV pen helper with cache ───────────────────────────────────
+# ─── HSV pen helper ──────────────────────────────────────────────
 _pen_cache = {}
 _PEN_CACHE_MAX = 256
 
@@ -280,80 +278,36 @@ def _update():
         display.update()
 
 
-# ─── Simple PRNG ─────────────────────────────────────────────────
-_seed = 12345
-
-
-def rng():
-    global _seed
-    _seed = (_seed * 1103515245 + 12345) & 0x7FFFFFFF
-    return _seed
-
-
-def rng_range(a, b):
-    return a + rng() % (b - a + 1)
-
-
-def rng_float():
-    return (rng() & 0xFFFF) / 65536.0
-
-
-# ─── Twinkling stars ─────────────────────────────────────────────
-class Star:
-    __slots__ = ("x", "y", "hue", "phase", "speed")
-
-    def __init__(self):
-        self.x = rng_range(5, WIDTH - 5)
-        self.y = rng_range(40, HEIGHT - 30)
-        self.hue = rng_float()
-        self.phase = rng_float() * 6.28
-        self.speed = 0.4 + rng_float() * 0.8
-
-    def draw(self, t):
-        brightness = (math.sin(self.phase + t * self.speed) + 1.0) * 0.5
-        if brightness < 0.35:
-            return
-        pen = hsv_pen(self.hue + t * 0.01, 0.4, brightness * 0.5)
-        display.set_pen(pen)
-        s = 1 if brightness < 0.7 else 2
-        display.rectangle(self.x, self.y, s, s)
-
-
-stars = [Star() for _ in range(12)]
+def _set_layer():
+    if presto:
+        display.set_layer(0)
 
 
 # ─── Boot screen ─────────────────────────────────────────────────
-_BOOT_STEPS = 5  # init, wifi, time, fetch, ai
+_BOOT_STEPS = 5
 
 
 def boot_screen(message, step, color=None):
     cx = WIDTH // 2
-
-    if presto:
-        display.set_layer(0)
+    _set_layer()
     display.set_pen(BG)
     display.clear()
 
-    # Title
     title = _s("title")
-    tw = display.measure_text(title, scale=4, spacing=1)
+    tw = display.measure_text(title, scale=_S_BOOT_TITLE, spacing=1)
     display.set_pen(TEXT)
-    display.text(title, cx - tw // 2, HEIGHT // 4 - 20, -1, scale=4, spacing=1)
+    display.text(title, cx - tw // 2, HEIGHT // 4 - 10 * _S_BOOT_TITLE // 2, -1, scale=_S_BOOT_TITLE, spacing=1)
 
-    # Decorative dots (rainbow)
-    dot_y = HEIGHT // 4 + 25
-    for i in range(5):
-        dx = (i - 2) * 20
-        pen = hsv_pen(i / 5.0, 0.8, 0.85)
-        display.set_pen(pen)
-        display.circle(cx + dx, dot_y, 3)
+    if not IS_SMALL:
+        dot_y = HEIGHT // 4 + 10 * _S_BOOT_TITLE // 2 + 5
+        for i in range(5):
+            display.set_pen(hsv_pen(i / 5.0, 0.8, 0.85))
+            display.circle(cx + (i - 2) * 20, dot_y, 3)
 
-    # Progress bar
     bar_w = int(WIDTH * 0.7)
-    bar_h = 10
+    bar_h = 6 if IS_SMALL else 10
     bx = cx - bar_w // 2
     by = HEIGHT // 2 - 5
-
     display.set_pen(DIM)
     display.rectangle(bx, by, bar_w, bar_h)
 
@@ -361,76 +315,104 @@ def boot_screen(message, step, color=None):
     if fill > 0:
         for x in range(0, fill, 4):
             w = min(4, fill - x)
-            pen = hsv_pen(x / bar_w, 0.8, 0.9)
-            display.set_pen(pen)
+            display.set_pen(hsv_pen(x / bar_w, 0.8, 0.9))
             display.rectangle(bx + x, by + 1, w, bar_h - 2)
 
-    for i in range(_BOOT_STEPS):
-        dot_x = bx + int(bar_w * (i + 1) / _BOOT_STEPS)
-        if i < step:
-            pen = hsv_pen(i / _BOOT_STEPS, 0.7, 0.9)
-            display.set_pen(pen)
-        else:
-            display.set_pen(DIM)
-        display.circle(dot_x, by + bar_h // 2, 4)
+    if not IS_SMALL:
+        for i in range(_BOOT_STEPS):
+            dot_x = bx + int(bar_w * (i + 1) / _BOOT_STEPS)
+            display.set_pen(hsv_pen(i / _BOOT_STEPS, 0.7, 0.9) if i < step else DIM)
+            display.circle(dot_x, by + bar_h // 2, 4)
 
     display.set_pen(color if color else TEXT)
-    sw = display.measure_text(message, scale=3, spacing=1)
-    display.text(message, cx - sw // 2, HEIGHT // 2 + 25, -1, scale=3, spacing=1)
-
+    sw = display.measure_text(message, scale=_S_BOOT_MSG, spacing=1)
+    display.text(message, cx - sw // 2, HEIGHT // 2 + 15, -1, scale=_S_BOOT_MSG, spacing=1)
     _update()
 
 
 # ─── Time helpers ────────────────────────────────────────────────
 def _get_utc_offset():
     month = time.localtime()[1]
-    if 4 <= month <= 9:
-        return UTC_OFFSET_SUMMER
-    return UTC_OFFSET_WINTER
+    return UTC_OFFSET_SUMMER if 4 <= month <= 9 else UTC_OFFSET_WINTER
 
 
 def _utc_to_local(utc):
-    offset = _get_utc_offset()
-    local_secs = time.mktime(utc) + offset * 3600
-    return time.localtime(local_secs)
+    return time.localtime(time.mktime(utc) + _get_utc_offset() * 3600)
 
 
 def _time_is_sane():
     return time.localtime()[0] >= 2025
 
 
+def _is_night():
+    """Check if current time is in the dim period."""
+    hour = time.localtime()[3]
+    if DIM_HOUR_START > DIM_HOUR_END:
+        return hour >= DIM_HOUR_START or hour < DIM_HOUR_END
+    return DIM_HOUR_START <= hour < DIM_HOUR_END
+
+
+# ─── WiFi helper ─────────────────────────────────────────────────
+_wlan = None
+
+
+def _connect_wifi():
+    """Try to connect to WiFi. Returns True if connected."""
+    global _wlan
+    if not WIFI_SSID:
+        return False
+    try:
+        import network
+        if _wlan is None:
+            _wlan = network.WLAN(network.STA_IF)
+            _wlan.active(True)
+        if _wlan.isconnected():
+            return True
+        _wlan.connect(WIFI_SSID, WIFI_PASSWORD)
+        for _ in range(100):
+            if _wlan.isconnected():
+                return True
+            time.sleep(0.1)
+    except Exception:
+        pass
+    return False
+
+
+def _is_wifi_connected():
+    return _wlan is not None and _wlan.isconnected()
+
+
 # ─── AI reformulation ───────────────────────────────────────────
 def _ai_rewrite(events_list):
-    """Rewrite events for kids using an AI API. Returns list of new texts."""
     if not AI_API_KEY or not events_list:
-        return None
+        return None, "no API key"
 
     provider = _AI_DEFAULTS.get(AI_PROVIDER)
     if not provider:
-        return None
+        return None, "unknown provider"
 
     url = provider["url"]
     model = AI_MODEL or provider["model"]
     lang_name = _LANG_NAMES.get(LANGUAGE, "English")
 
-    # Build year->title lookup from original events
-    _title_by_year = {}
-    for ev in events_list:
-        if ev[0] is not None and len(ev) > 3 and ev[3]:
-            _title_by_year[ev[0]] = ev[3]
+    # Build index->title lookup (not year, since years can collide)
+    _title_by_idx = {}
+    for i, ev in enumerate(events_list):
+        if len(ev) > 3 and ev[3]:
+            _title_by_idx[i + 1] = ev[3]  # 1-indexed
 
-    # Build a single prompt with all events
     event_lines = []
     for i, ev in enumerate(events_list):
-        year, text = ev[0], ev[1]
-        event_lines.append("{}. [{}] {}".format(i + 1, year or "?", text))
+        is_birth = ev[4] if len(ev) > 4 else False
+        tag = "[BIRTH {}]".format(ev[0] or "?") if is_birth else "[{}]".format(ev[0] or "?")
+        event_lines.append("{}. {} {}".format(i + 1, tag, ev[1]))
     events_block = "\n".join(event_lines)
 
     prompt = (
         "You are preparing a daily \"On This Day\" display for a {age}-year-old child. "
         "The display uses a small screen with a bitmap font (ASCII only, no Unicode/emojis in text). "
         "But we CAN display a small emoji icon next to each event.\n\n"
-        "Below are historical events that happened on this date.\n\n"
+        "Below are historical events and notable births that happened on this date.\n\n"
         "Your job:\n"
         "1. REWRITE each event so a {age}-year-old can understand, but:\n"
         "   - KEEP real names of people, places, and things\n"
@@ -438,21 +420,31 @@ def _ai_rewrite(events_list):
         "   - Just use simpler sentence structure\n"
         "   - 1-2 short sentences per event\n"
         "   - Text must be ASCII only (no emojis, no special chars)\n"
-        "2. For violent/war events: if historically very important "
-        "(end of a major war, major treaty), keep but rephrase gently. "
-        "Skip minor violent events by using null.\n"
+        "   - CAPITALIZE the first letter of each text\n"
+        "   - For BIRTH entries: say WHO the person is and WHY they are famous, "
+        "not just that they were born. Example: \"Rudolf Diesel, l'inventeur du "
+        "moteur diesel, est ne a Paris.\"\n"
+        "2. For violent/war events: {violence_rule}\n"
         "3. Pick exactly 1 emoji for each event. Put the actual emoji character "
-        "in the \"icon\" field (e.g. \"icon\": \"\\ud83d\\ude80\" for rocket). "
-        "Use standard Unicode emojis only.\n"
+        "in the \"icon\" field. Use standard Unicode emojis only.\n"
         "4. Respond in {lang}\n"
         "5. Return a JSON array of objects, REORDERED with the most interesting "
         "for children first (space, science, inventions, animals, sports, exploration). "
-        "Each object: {{\"year\": <original year>, \"text\": \"rewritten text\", "
-        "\"icon\": \"<single emoji>\"}}. "
+        "Each object: {{\"id\": <original event number>, \"year\": <year>, "
+        "\"text\": \"rewritten text\", \"icon\": \"<single emoji>\", "
+        "\"birth\": true/false}}. "
         "Use null instead of an object to skip an event.\n"
         "No markdown, no explanation, just the JSON array.\n\n"
         "Events:\n{events}"
-    ).format(age=KID_AGE, lang=lang_name, events=events_block)
+    ).format(
+        age=KID_AGE, lang=lang_name, events=events_block,
+        violence_rule=(
+            "Keep all events, including wars and conflicts. Rephrase for clarity but don't skip anything."
+            if KID_AGE >= 10 else
+            "If historically very important (end of a major war, major treaty), keep but rephrase gently. "
+            "Skip minor violent events by using null. Pick friendly emojis (no weapons)."
+        ),
+    )
 
     import urequests
     try:
@@ -460,7 +452,6 @@ def _ai_rewrite(events_list):
             "Content-Type": "application/json",
             "Authorization": "Bearer " + AI_API_KEY,
         }
-        # Gemini uses key param instead of Bearer token
         if AI_PROVIDER == "gemini":
             url = url + "?key=" + AI_API_KEY
             headers.pop("Authorization")
@@ -493,7 +484,6 @@ def _ai_rewrite(events_list):
 
         content = data["choices"][0]["message"]["content"]
         content = content.strip()
-        # Strip markdown code fences if present
         if content.startswith("```"):
             content = content.split("\n", 1)[1]
             content = content.rsplit("```", 1)[0]
@@ -509,22 +499,23 @@ def _ai_rewrite(events_list):
                     if not text:
                         continue
                     yr = item.get("year")
-                    title = _title_by_year.get(yr, "")
-                    # Convert emoji char to codepoint for Twemoji
+                    idx = item.get("id")
+                    title = _title_by_idx.get(idx, "") if idx else ""
+                    is_birth = item.get("birth", False)
                     icon_char = item.get("icon", "")
                     icons = []
                     if icon_char:
                         try:
-                            # Filter out variation selectors (fe0f, fe0e) that Twemoji doesn't use in filenames
-                            parts = ["{:x}".format(ord(c)) for c in icon_char if ord(c) > 255 and ord(c) != 0xfe0f and ord(c) != 0xfe0e]
+                            parts = ["{:x}".format(ord(c)) for c in icon_char
+                                     if ord(c) > 255 and ord(c) != 0xfe0f and ord(c) != 0xfe0e]
                             cp = "-".join(parts)
                             if cp:
                                 icons = [cp]
                         except Exception:
                             pass
-                    reordered.append((yr, text, icons, title))
+                    reordered.append((yr, _capitalize(text), icons, title, is_birth))
                 elif isinstance(item, str):
-                    reordered.append((None, item, [], ""))
+                    reordered.append((None, _capitalize(item), [], "", False))
             if reordered:
                 return reordered, None
             return None, "empty result"
@@ -548,7 +539,6 @@ try:
     except Exception:
         import os
         os.mount(_sd, SD_DIR)
-    # Verify SD is actually writable (create a subdir and file)
     _test_dir = SD_DIR + "/_test"
     _test_file = _test_dir + "/t"
     try:
@@ -578,7 +568,6 @@ CACHE_FILE = STORAGE_DIR + "/day_cache.json"
 
 
 def _cache_key():
-    """Build a cache key from today's date + hash of main.py content."""
     file_hash = 0
     try:
         import hashlib
@@ -601,7 +590,6 @@ def _cache_key():
 
 
 def _load_cache():
-    """Load cached events if cache key matches. Returns list of tuples or None."""
     try:
         import json
         with open(CACHE_FILE) as f:
@@ -612,7 +600,7 @@ def _load_cache():
             return None
         events = []
         for ev in data.get("events", []):
-            events.append((ev.get("year"), ev.get("text", ""), ev.get("icons", []), ev.get("title", "")))
+            events.append((ev.get("year"), ev.get("text", ""), ev.get("icons", []), ev.get("title", ""), ev.get("birth", False)))
         print("[cache] loaded", len(events), "events")
         return events if events else None
     except Exception as e:
@@ -621,17 +609,70 @@ def _load_cache():
 
 
 def _save_cache(events):
-    """Save events to cache file."""
     try:
         import json
         ev_list = []
         for ev in events:
-            ev_list.append({"year": ev[0], "text": ev[1], "icons": ev[2] if len(ev) > 2 else [], "title": ev[3] if len(ev) > 3 else ""})
+            ev_list.append({
+                "year": ev[0], "text": ev[1],
+                "icons": ev[2] if len(ev) > 2 else [],
+                "title": ev[3] if len(ev) > 3 else "",
+                "birth": ev[4] if len(ev) > 4 else False,
+            })
         with open(CACHE_FILE, "w") as f:
             json.dump({"key": _cache_key(), "events": ev_list}, f)
         print("[cache] saved", len(ev_list), "events to", CACHE_FILE)
     except Exception as e:
         print("[cache] save error:", e)
+
+
+# ─── Fetch events from Wikipedia ─────────────────────────────────
+def _fetch_events(month, day):
+    """Fetch selected events + notable births from Wikipedia."""
+    import urequests
+    events = []
+    base = "https://api.wikimedia.org/feed/v1/wikipedia/{}/onthisday".format(LANGUAGE)
+    hdrs = {"User-Agent": "PimoroniEmulator/1.0"}
+
+    # Fetch selected events
+    try:
+        print("[fetch] selected events...")
+        resp = urequests.get("{}/selected/{:02d}/{:02d}".format(base, month, day), headers=hdrs)
+        if resp.status_code == 200:
+            data = resp.json()
+            raw = data.get("selected", [])
+            for item in raw:
+                text = item.get("text", "")
+                year = item.get("year")
+                pages = item.get("pages", [])
+                title = pages[0].get("title", "").replace("_", " ") if pages else ""
+                if text:
+                    events.append((year, _capitalize(text), [], title, False))
+        resp.close()
+    except Exception as e:
+        print("[fetch] events error:", e)
+
+    # Fetch notable births (top 5)
+    try:
+        print("[fetch] births...")
+        resp = urequests.get("{}/births/{:02d}/{:02d}".format(base, month, day), headers=hdrs)
+        if resp.status_code == 200:
+            data = resp.json()
+            raw = data.get("births", [])
+            for item in raw[:5]:
+                text = item.get("text", "")
+                year = item.get("year")
+                pages = item.get("pages", [])
+                title = pages[0].get("title", "").replace("_", " ") if pages else ""
+                if text:
+                    events.append((year, _capitalize(text), [], title, True))
+        resp.close()
+    except Exception as e:
+        print("[fetch] births error:", e)
+
+    events.sort(key=lambda e: e[0] if e[0] is not None else 9999)
+    print("[fetch] total:", len(events), "events")
+    return events
 
 
 # ─── Boot sequence ───────────────────────────────────────────────
@@ -648,25 +689,11 @@ try:
         boot_screen("Skip boot", 2, DIM)
     elif WIFI_SSID:
         boot_screen(_s("wifi_connect") + "...", 0)
-        try:
-            import network
-            wlan = network.WLAN(network.STA_IF)
-            wlan.active(True)
-            wlan.connect(WIFI_SSID, WIFI_PASSWORD)
-            for _i in range(100):
-                if wlan.isconnected():
-                    break
-                if _i % 10 == 0:
-                    dots = "." * ((_i // 10) % 4 + 1)
-                    boot_screen(_s("wifi_connect") + dots, 0)
-                time.sleep(0.1)
-            wifi_ok = wlan.isconnected()
-            if wifi_ok:
-                boot_screen(_s("wifi_ok"), 1, OK_PEN)
-            else:
-                boot_screen(_s("wifi_fail"), 1, ERR_PEN)
-        except Exception:
-            boot_screen(_s("network_err"), 1, ERR_PEN)
+        wifi_ok = _connect_wifi()
+        if wifi_ok:
+            boot_screen(_s("wifi_ok"), 1, OK_PEN)
+        else:
+            boot_screen(_s("wifi_fail"), 1, ERR_PEN)
     else:
         boot_screen(_s("no_wifi_cfg"), 1, DIM)
     time.sleep(0.3)
@@ -712,39 +739,10 @@ try:
         boot_screen("Cache OK !", 4, OK_PEN)
         time.sleep(0.3)
     else:
-        # Step 3: Fetch events from Wikipedia
         events = []
         if wifi_ok:
             boot_screen(_s("fetch") + "...", 2)
-            api_url = (
-                "https://api.wikimedia.org/feed/v1/wikipedia/{}/onthisday/{}/{:02d}/{:02d}"
-                .format(LANGUAGE, EVENT_CATEGORY, today_month, today_day)
-            )
-            try:
-                import urequests
-                resp = urequests.get(api_url, headers={"User-Agent": "PimoroniEmulator/1.0"})
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if isinstance(data, dict):
-                        raw = (data.get(EVENT_CATEGORY)
-                               or data.get("selected")
-                               or data.get("events")
-                               or [])
-                    elif isinstance(data, list):
-                        raw = data
-                    else:
-                        raw = []
-                    for item in raw:
-                        text = item.get("text", "")
-                        year = item.get("year")
-                        pages = item.get("pages", [])
-                        title = pages[0].get("title", "").replace("_", " ") if pages else ""
-                        if text and (AI_API_KEY or _is_kid_safe(text)):
-                            events.append((year, text, [], title))
-                    events.sort(key=lambda e: e[0] if e[0] is not None else 9999)
-                resp.close()
-            except Exception:
-                pass
+            events = _fetch_events(today_month, today_day)
 
         if events:
             boot_screen("{} events !".format(len(events)), 3, OK_PEN)
@@ -752,7 +750,7 @@ try:
             boot_screen(_s("no_events") if wifi_ok else _s("fetch_fail"), 3, ERR_PEN)
         time.sleep(0.3)
 
-        # Step 4: AI reformulation (optional, with retries)
+        # Step 4: AI reformulation
         if AI_API_KEY and events:
             rewritten = None
             last_err = None
@@ -770,52 +768,49 @@ try:
                 events = rewritten
                 boot_screen(_s("ai_rewrite") + " OK !", 4, OK_PEN)
             else:
+                events = [(e[0], _capitalize(e[1]), e[2], e[3] if len(e) > 3 else "", e[4] if len(e) > 4 else False) for e in events]
                 boot_screen(last_err or "failed", 4, ERR_PEN)
                 time.sleep(2)
         else:
             boot_screen("...", 4)
         time.sleep(0.3)
 
-        # Save to cache for next boot
         if events:
             _save_cache(events)
 
-    # Step 5: Pre-download icons (always, cache may not have them on disk)
-    if wifi_ok:
-        try:
-            from icons import IconLoader
-            icon_loader = IconLoader(display, size=28, cache_dir=STORAGE_DIR + "/icon_cache")
-            all_tags = set()
-            for ev in events:
-                if len(ev) > 2:
-                    for tag in ev[2]:
-                        all_tags.add(tag)
-            if all_tags:
-                boot_screen("Icons...", 4)
-                icon_loader.ensure_many(all_tags)
-        except Exception:
-            icon_loader = None
-    else:
-        # Try to load icon loader even offline (icons may be cached)
-        try:
-            from icons import IconLoader
-            icon_loader = IconLoader(display, size=28, cache_dir=STORAGE_DIR + "/icon_cache")
-        except Exception:
-            icon_loader = None
+    # Step 5: Icons
+    try:
+        from icons import IconLoader
+        icon_loader = IconLoader(display, size=28, cache_dir=STORAGE_DIR + "/icon_cache")
+        all_tags = set()
+        for ev in events:
+            if len(ev) > 2:
+                for tag in ev[2]:
+                    all_tags.add(tag)
+        if all_tags and (_is_wifi_connected() or wifi_ok):
+            boot_screen("Icons...", 4)
+            icon_loader.ensure_many(all_tags)
+    except Exception:
+        icon_loader = None
 
     boot_screen(_s("ready"), 5, OK_PEN)
     time.sleep(0.4)
 
+    # ─── Layout constants (adaptive) ────────────────────────────
+    MARGIN = 6 if IS_SMALL else (10 if IS_MEDIUM else 20)
+    HEADER_H = 20 if IS_SMALL else (28 if IS_MEDIUM else 60)
+    FOOTER_H = 0
+    TIMESCALE_H = 14 if IS_SMALL else (18 if IS_MEDIUM else 24)
+    LINE_H = {1: 12, 2: 20, 3: 30, 4: 40}
+    ICON_SZ = 72  # Twemoji native size
+    BIRTH_PEN = display.create_pen(255, 180, 100)
 
-    # ─── Text layout ────────────────────────────────────────────────
-    MARGIN = 20
-    HEADER_H = 60
-    FOOTER_H = 40
-    TIMESCALE_H = 24  # height for the "X years ago" bar
-    LINE_H_S4 = 40
-    LINE_H_S3 = 30
-    LINE_H_S2 = 20
-
+    # Pre-create fade background pens (skip on e-ink)
+    _FADE_BGS = []
+    if not IS_EINK:
+        for _fi in range(11):
+            _fade = _fi / 10.0
+            _FADE_BGS.append(display.create_pen(int(15 * _fade), int(12 * _fade), int(30 * _fade)))
 
     def word_wrap(text, max_width, scale=2):
         words = text.split()
@@ -833,138 +828,136 @@ try:
             lines.append(current)
         return lines
 
-
-    # ─── Drawing ─────────────────────────────────────────────────────
+    # ─── Drawing ─────────────────────────────────────────────────
     def draw_header(t):
         date_str = "{} {} {}".format(today_day, _month_name(today_month), today_year)
-
         display.set_pen(HEADER_BG)
         display.rectangle(0, 0, WIDTH, HEADER_H)
 
-        tw = display.measure_text(date_str, scale=4, spacing=1)
+        tw = display.measure_text(date_str, scale=_S_TITLE, spacing=1)
         tx = WIDTH // 2 - tw // 2
-
-        # Colorful shadow
-        pen = hsv_pen((t * 0.03) % 1.0, 0.7, 0.6)
-        display.set_pen(pen)
-        display.text(date_str, tx + 2, 12, -1, scale=4, spacing=1)
-
+        ty = (HEADER_H - 8 * _S_TITLE) // 2
+        if not IS_EINK:
+            display.set_pen(hsv_pen((t * 0.03) % 1.0, 0.7, 0.6))
+            display.text(date_str, tx + 2, ty + 2, -1, scale=_S_TITLE, spacing=1)
         display.set_pen(TEXT)
-        display.text(date_str, tx, 10, -1, scale=4, spacing=1)
+        display.text(date_str, tx, ty, -1, scale=_S_TITLE, spacing=1)
 
-        # Rainbow accent line
-        line_y = HEADER_H - 3
+        line_y = HEADER_H - (2 if IS_SMALL else 3)
         line_w = WIDTH - MARGIN * 2
-        for x in range(0, line_w, 4):
-            w = min(4, line_w - x)
-            pen = hsv_pen((x / line_w + t * 0.03) % 1.0, 0.8, 0.9)
-            display.set_pen(pen)
-            display.rectangle(MARGIN + x, line_y, w, 3)
+        if IS_EINK:
+            display.set_pen(TEXT)
+            display.rectangle(MARGIN, line_y, line_w, 1)
+        else:
+            for x in range(0, line_w, 4):
+                w = min(4, line_w - x)
+                display.set_pen(hsv_pen((x / line_w + t * 0.03) % 1.0, 0.8, 0.9))
+                display.rectangle(MARGIN + x, line_y, w, 2 if IS_SMALL else 3)
 
+    # Timescale: covers -1000 BC to present (~3026 years total)
+    _TS_MIN_YEAR = -1000  # 1000 BC
+    _TS_RANGE = today_year - _TS_MIN_YEAR  # e.g. 3026
 
     def draw_timescale(year, t):
-        """Draw a visual time scale showing how far in the past the event is."""
         if year is None:
-            return 0  # no extra height used
-
-        years_ago = today_year - year
-        if years_ago < 0:
-            years_ago = 0
-
+            return 0
+        years_ago = max(0, today_year - year)
         y_top = HEADER_H + 8
         bar_x = MARGIN
         bar_w = WIDTH - MARGIN * 2
 
-        # "il y a X ans" label
-        ago_str = _years_ago_str(years_ago)
         display.set_pen(TEXT)
-        display.text(ago_str, bar_x, y_top, -1, scale=2, spacing=1)
+        display.text(_years_ago_str(years_ago), bar_x, y_top, -1, scale=_S_AGO, spacing=1)
 
-        # Time bar: represents 0-2000 years, with the event marked
-        bar_y = y_top + 16
+        bar_y = y_top + 8 * _S_AGO + 2
         bar_h = 6
 
         # Background track
         display.set_pen(TIMESCALE_BG)
         display.rectangle(bar_x, bar_y, bar_w, bar_h)
 
-        # Fill from right (now) to left (past), proportional to age
-        max_years = 2000
-        ratio = min(1.0, years_ago / max_years)
-        fill_w = max(4, int(bar_w * ratio))
-        fill_start = bar_x + bar_w - fill_w
+        # Tick marks at 0, 1000, 2000
+        display.set_pen(DIM)
+        for mark_year in (0, 1000, 2000):
+            if _TS_MIN_YEAR < mark_year < today_year:
+                mx = bar_x + int(bar_w * (mark_year - _TS_MIN_YEAR) / _TS_RANGE)
+                display.rectangle(mx, bar_y - 2, 1, bar_h + 4)
 
-        # Rainbow gradient fill (right=now, left=past)
-        for x in range(0, fill_w, 4):
-            w = min(4, fill_w - x)
-            hue = (x / bar_w * 0.7 + t * 0.02) % 1.0
-            pen = hsv_pen(hue, 0.7, 0.8)
-            display.set_pen(pen)
-            display.rectangle(fill_start + x, bar_y + 1, w, bar_h - 2)
+        # Fill from event year to now (right side)
+        event_pos = max(0.0, min(1.0, (year - _TS_MIN_YEAR) / _TS_RANGE))
+        fill_start_x = bar_x + int(bar_w * event_pos)
+        fill_w = bar_x + bar_w - fill_start_x
 
-        # Marker dot at the event position (left end of fill)
-        pen = hsv_pen((t * 0.03) % 1.0, 0.8, 1.0)
-        display.set_pen(pen)
-        display.circle(max(fill_start, bar_x + 4), bar_y + bar_h // 2, 4)
+        if fill_w > 0:
+            for x in range(0, fill_w, 4):
+                w = min(4, fill_w - x)
+                hue = (x / max(1, bar_w) * 0.7 + t * 0.02) % 1.0
+                display.set_pen(hsv_pen(hue, 0.7, 0.8))
+                display.rectangle(fill_start_x + x, bar_y + 1, w, bar_h - 2)
+
+        # Marker dot at event position
+        display.set_pen(hsv_pen((t * 0.03) % 1.0, 0.8, 1.0))
+        display.circle(max(fill_start_x, bar_x + 4), bar_y + bar_h // 2, 4)
 
         return TIMESCALE_H
 
-
-    def draw_event(idx, t):
+    def draw_event(idx, t, alpha=1.0):
         if not events:
             display.set_pen(DIM)
             msg = _s("no_events")
-            mw = display.measure_text(msg, scale=4, spacing=1)
-            display.text(msg, WIDTH // 2 - mw // 2, HEIGHT // 2 - 16, -1, scale=4, spacing=1)
+            mw = display.measure_text(msg, scale=_S_TITLE, spacing=1)
+            display.text(msg, WIDTH // 2 - mw // 2, HEIGHT // 2 - 16, -1, scale=_S_TITLE, spacing=1)
             return
 
         ev = events[idx]
         year, text = ev[0], ev[1]
-        event_icons = ev[2] if len(ev) > 2 else []
         title = ev[3] if len(ev) > 3 else ""
+        is_birth = ev[4] if len(ev) > 4 else False
         body_width = WIDTH - MARGIN * 2
 
-        # Time scale
         ts_h = draw_timescale(year, t)
         body_top = HEADER_H + 8 + ts_h + 4
         body_bottom = HEIGHT - FOOTER_H - 6
 
-        # Year with color cycling
         y_cursor = body_top
         if year is not None:
             year_str = str(year)
-            yw = display.measure_text(year_str, scale=4, spacing=1)
+            yw = display.measure_text(year_str, scale=_S_YEAR, spacing=1)
+            if IS_EINK:
+                display.set_pen(TEXT)
+            elif is_birth:
+                display.set_pen(BIRTH_PEN)
+            else:
+                display.set_pen(hsv_pen((t * 0.02 + idx * 0.15) % 1.0, 0.7, alpha))
+            display.text(year_str, MARGIN, y_cursor, -1, scale=_S_YEAR, spacing=1)
+            if not IS_SMALL:
+                pen2 = hsv_pen((t * 0.02 + idx * 0.15 + 0.3) % 1.0, 0.5, 0.6 * alpha)
+                display.set_pen(pen2)
+                display.rectangle(MARGIN + yw + 10, y_cursor + 8 * _S_YEAR // 2, 40, 3)
+            y_cursor += LINE_H[_S_YEAR] + (2 if IS_SMALL else 6)
 
-            pen = hsv_pen((t * 0.02 + idx * 0.15) % 1.0, 0.7, 1.0)
-            display.set_pen(pen)
-            display.text(year_str, MARGIN, y_cursor, -1, scale=4, spacing=1)
+        if title and not IS_SMALL and not IS_MEDIUM:
+            max_title_w = body_width
+            truncated_title = title
+            while display.measure_text(truncated_title, scale=_S_NAME, spacing=1) > max_title_w and len(truncated_title) > 10:
+                truncated_title = truncated_title[:-4] + "..."
+            if IS_EINK:
+                display.set_pen(TEXT)
+            elif is_birth:
+                display.set_pen(BIRTH_PEN)
+            else:
+                display.set_pen(hsv_pen((t * 0.02 + idx * 0.15 + 0.15) % 1.0, 0.5, 0.9 * alpha))
+            display.text(truncated_title, MARGIN, y_cursor, -1, scale=_S_NAME, spacing=1)
+            y_cursor += LINE_H[_S_NAME] + 2
 
-            # Decorative bar after year
-            pen2 = hsv_pen((t * 0.02 + idx * 0.15 + 0.3) % 1.0, 0.5, 0.6)
-            display.set_pen(pen2)
-            display.rectangle(MARGIN + yw + 10, y_cursor + 16, 40, 3)
-
-            y_cursor += LINE_H_S4 + 6
-
-        # Event title (original Wikipedia article name)
-        if title:
-            pen = hsv_pen((t * 0.02 + idx * 0.15 + 0.15) % 1.0, 0.5, 0.9)
-            display.set_pen(pen)
-            display.text(title, MARGIN, y_cursor, -1, scale=2, spacing=1)
-            y_cursor += LINE_H_S2 + 2
-
-        # Event text — try scale=3 first, then scale=2
         available_h = body_bottom - y_cursor
-
-        lines = word_wrap(text, body_width, scale=3)
-        line_h = LINE_H_S3
-        scale = 3
-
+        lines = word_wrap(text, body_width, scale=_S_BODY_BIG)
+        line_h = LINE_H[_S_BODY_BIG]
+        scale = _S_BODY_BIG
         if len(lines) * line_h > available_h:
-            lines = word_wrap(text, body_width, scale=2)
-            line_h = LINE_H_S2
-            scale = 2
-
+            lines = word_wrap(text, body_width, scale=_S_BODY_SM)
+            line_h = LINE_H[_S_BODY_SM]
+            scale = _S_BODY_SM
         max_lines = max(1, available_h // line_h)
         truncated = len(lines) > max_lines
         if truncated:
@@ -974,55 +967,18 @@ try:
         for line in lines:
             display.text(line, MARGIN, y_cursor, -1, scale=scale, spacing=1)
             y_cursor += line_h
-
         if truncated:
             display.set_pen(DIM)
             display.text("...", MARGIN + 8, y_cursor, -1, scale=scale, spacing=1)
 
-
-    def draw_footer(idx, t):
-        if not events:
-            return
-
-        footer_y = HEIGHT - FOOTER_H
-
-        # Rainbow separator
-        line_w = WIDTH - MARGIN * 2
-        for x in range(0, line_w, 4):
-            w = min(4, line_w - x)
-            pen = hsv_pen((x / line_w + t * 0.03 + 0.5) % 1.0, 0.6, 0.5)
-            display.set_pen(pen)
-            display.rectangle(MARGIN + x, footer_y, w, 2)
-
-        # Navigation arrows
-        pen = hsv_pen((t * 0.05) % 1.0, 0.6, 0.9)
-        display.set_pen(pen)
-        ax = MARGIN + 6
-        ay = footer_y + 20
-        display.triangle(ax, ay, ax + 12, ay - 10, ax + 12, ay + 10)
-        rx = WIDTH - MARGIN - 6
-        display.triangle(rx, ay, rx - 12, ay - 10, rx - 12, ay + 10)
-
-        # Counter
-        counter = "{}/{}".format(idx + 1, len(events))
-        display.set_pen(TEXT)
-        cw = display.measure_text(counter, scale=2, spacing=1)
-        display.text(counter, rx - 16 - cw, footer_y + 10, -1, scale=2, spacing=1)
-
-
-    # Icon is 72px from Twemoji (rendered at native size)
-    ICON_SZ = 72
-
     def draw_icon(idx):
-        """Draw a single icon in the bottom-right of the text area."""
-        if not events or not icon_loader:
+        if IS_SMALL or IS_MEDIUM or not events or not icon_loader:
             return
         event_icons = events[idx][2] if len(events[idx]) > 2 else []
         if event_icons:
             icon_x = WIDTH - MARGIN - ICON_SZ - 4
             icon_y = HEIGHT - FOOTER_H - ICON_SZ - 4
             icon_loader.draw(event_icons[0], icon_x, icon_y)
-
 
     def update_leds(t):
         if not presto:
@@ -1032,57 +988,149 @@ try:
             brightness = 0.12 + math.sin(t * 0.3 + i * 0.9) * 0.06
             presto.set_led_hsv(i, hue, 0.5, max(0.0, brightness))
 
+    # ─── Transition animation ────────────────────────────────────
+    def draw_frame(idx, t, fade=1.0):
+        """Draw a complete frame. fade: 0.0 = black, 1.0 = fully visible."""
+        _set_layer()
 
-    # ─── Main loop ───────────────────────────────────────────────────
+        if not IS_EINK and fade < 1.0 and _FADE_BGS:
+            fi = max(0, min(10, int(fade * 10)))
+            display.set_pen(_FADE_BGS[fi])
+        else:
+            display.set_pen(BG)
+        display.clear()
+
+        if fade > 0.3 or IS_EINK:
+            draw_header(t)
+            draw_event(idx, t, alpha=fade if not IS_EINK else 1.0)
+            draw_icon(idx)
+        update_leds(t)
+        _update()
+
+    # ─── Button input (non-touch devices) ──────────────────────
+    _buttons = {}
+
+    def _check_buttons():
+        """Check for button presses (Badger, Inky Frame, Tufty). Returns True if pressed."""
+        try:
+            from machine import Pin
+            # Common button pins across devices
+            for pin_num in (12, 13, 14, 15):  # Badger/Inky A/B/C/Up/Down
+                if pin_num not in _buttons:
+                    _buttons[pin_num] = Pin(pin_num, Pin.IN, Pin.PULL_UP)
+                if _buttons[pin_num].value() == 0:
+                    return True
+        except Exception:
+            pass
+        return False
+
+    # ─── Main loop ───────────────────────────────────────────────
     if presto:
-        presto.set_backlight(1.0)
+        presto.set_backlight(NORMAL_BRIGHTNESS)
 
     current_event = 0
     last_touch = False
+    sleeping = False
+    needs_redraw = True
 
-    t0 = time.ticks_ms() if hasattr(time, "ticks_ms") else int(time.time() * 1000)
+    _ticks = time.ticks_ms if hasattr(time, "ticks_ms") else lambda: int(time.time() * 1000)
+    t0 = _ticks()
     last_cycle_ms = t0
+    last_touch_ms = t0
+    last_day = today_day
+    last_wifi_retry_ms = t0
+    _transition_until = 0
+    _prev_event = -1
 
     while True:
-        now_ms = time.ticks_ms() if hasattr(time, "ticks_ms") else int(time.time() * 1000)
+        now_ms = _ticks()
         t = (now_ms - t0) / 1000.0
 
-        # Input
-        if presto:
+        # ─── Day change ──────────────────────────────────────
+        if int(t) % 3 == 0:
+            cur_day = time.localtime()[2]
+            if cur_day != last_day:
+                try:
+                    machine.reset()
+                except Exception:
+                    last_day = cur_day
+                    today_day = cur_day
+                    events = []
+                    needs_redraw = True
+
+        # ─── WiFi retry (every 60s if disconnected) ──────────
+        if WIFI_SSID and not _is_wifi_connected() and not SKIP_BOOT:
+            if (now_ms - last_wifi_retry_ms) > 60000:
+                last_wifi_retry_ms = now_ms
+                _connect_wifi()
+
+        # ─── Night dimming (Presto only) ─────────────────────
+        if presto and not sleeping:
+            target = DIM_BRIGHTNESS if _is_night() else NORMAL_BRIGHTNESS
+            presto.set_backlight(target)
+
+        # ─── Input: touch or buttons ─────────────────────────
+        user_input = False
+        if HAS_TOUCH:
             touch = presto.touch_a
             touched = touch.touched and not last_touch
             last_touch = touch.touched
+            user_input = touched
         else:
-            touched = False
+            user_input = _check_buttons()
 
-        if events and touched:
-            current_event = (current_event + 1) % len(events)
-            last_cycle_ms = now_ms
-            pass
-
-        if events and AUTO_CYCLE_SECS > 0:
-            elapsed = (now_ms - last_cycle_ms) / 1000.0
-            if elapsed >= AUTO_CYCLE_SECS:
+        if user_input:
+            last_touch_ms = now_ms
+            if sleeping:
+                sleeping = False
+                if presto:
+                    presto.set_backlight(DIM_BRIGHTNESS if _is_night() else NORMAL_BRIGHTNESS)
+            elif events:
+                _prev_event = current_event
                 current_event = (current_event + 1) % len(events)
                 last_cycle_ms = now_ms
+                needs_redraw = True
+                if not IS_EINK:
+                    _transition_until = now_ms + 400
+            # Debounce buttons
+            if not HAS_TOUCH:
+                time.sleep(0.2)
 
-        # Draw
-        if presto:
-            display.set_layer(0)
-        display.set_pen(BG)
-        display.clear()
+        # ─── Sleep on inactivity (Presto only) ───────────────
+        if presto and not sleeping and SLEEP_AFTER_SECS > 0:
+            if (now_ms - last_touch_ms) > SLEEP_AFTER_SECS * 1000:
+                sleeping = True
+                presto.set_backlight(SLEEP_BRIGHTNESS)
 
-        for s in stars:
-            s.draw(t)
+        # ─── Auto-cycle ─────────────────────────────────────
+        if events and AUTO_CYCLE_SECS > 0 and not sleeping:
+            elapsed = (now_ms - last_cycle_ms) / 1000.0
+            if elapsed >= AUTO_CYCLE_SECS:
+                _prev_event = current_event
+                current_event = (current_event + 1) % len(events)
+                last_cycle_ms = now_ms
+                needs_redraw = True
+                if not IS_EINK:
+                    _transition_until = now_ms + 400
 
-        draw_header(t)
-        draw_event(current_event, t)
-        draw_icon(current_event)
-        draw_footer(current_event, t)
-        update_leds(t)
-
-        _update()
-        time.sleep(0.05)
+        # ─── Draw ────────────────────────────────────────────
+        if IS_EINK:
+            # E-ink: only redraw when content changes
+            if needs_redraw:
+                draw_frame(current_event, t)
+                needs_redraw = False
+            time.sleep(0.1)
+        elif _transition_until > now_ms:
+            progress = 1.0 - ((_transition_until - now_ms) / 400.0)
+            if progress < 0.5:
+                fade = 1.0 - (progress * 2.0)
+                draw_frame(_prev_event if _prev_event >= 0 else current_event, t, fade)
+            else:
+                fade = (progress - 0.5) * 2.0
+                draw_frame(current_event, t, fade)
+        else:
+            draw_frame(current_event, t)
+            time.sleep(0.05)
 except Exception as e:
     import sys
     try:

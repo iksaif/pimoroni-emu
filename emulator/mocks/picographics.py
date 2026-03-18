@@ -68,7 +68,7 @@ class PicoGraphics:
 
     def __init__(
         self,
-        display: int,
+        display: int = None,
         rotate: int = 0,
         bus=None,
         buffer=None,
@@ -76,7 +76,21 @@ class PicoGraphics:
         extra_pins=None,
         width: int = None,
         height: int = None,
+        layers: int = None,
     ):
+        # Auto-detect display from emulator device if not specified
+        from emulator import get_state
+        if display is None:
+            _dev = get_state().get("device")
+            if _dev:
+                _w, _h = _dev.display_width, _dev.display_height
+                for _dt, _sz in _DISPLAY_SIZES.items():
+                    if _sz == (_w, _h):
+                        display = _dt
+                        break
+            if display is None:
+                display = DISPLAY_TUFTY_2350
+
         self.display_type = display
         self._rotate = rotate
         self._pen_type = pen_type
