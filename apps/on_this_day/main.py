@@ -64,6 +64,13 @@ try:
 
     draw.boot_screen("...", 0)
 
+    # Try to use inky_frame helpers (LEDs, buttons)
+    _inky = None
+    try:
+        import inky_frame as _inky
+    except ImportError:
+        pass
+
     # Step 1: WiFi
     wifi_ok = False
     if SKIP_BOOT:
@@ -193,6 +200,13 @@ try:
             pressed = touch.touched and not last_touch
             last_touch = touch.touched
             user_input = pressed
+        elif _inky:
+            # Inky Frame: check buttons A-E
+            for btn in (_inky.button_a, _inky.button_b, _inky.button_c,
+                        _inky.button_d, _inky.button_e):
+                if btn.is_pressed():
+                    user_input = True
+                    break
         else:
             try:
                 from machine import Pin

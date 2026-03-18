@@ -393,18 +393,29 @@ class EInkDisplay(BaseDisplay):
                     self._window.blit(text, text_rect)
                 x += 50
 
-        # Draw busy/activity LED
+        # Draw status LEDs (busy + wifi)
         if getattr(self.device, 'has_busy_led', False):
+            win_w = self.device.get_window_size()[0]
+            win_h = self.device.get_window_size()[1]
+            font_sm = safe_font(pygame, "monospace", 10)
+
+            # Busy/activity LED
             busy_led = leds.get("busy")
             busy_on = busy_led and busy_led.is_on if busy_led else False
             busy_color = (255, 180, 50) if busy_on else (60, 60, 55)
-            win_w = self.device.get_window_size()[0]
-            win_h = self.device.get_window_size()[1]
             pygame.draw.circle(self._window, busy_color, (win_w - 20, win_h - 20), 6)
-            font_sm = safe_font(pygame, "monospace", 10)
             if font_sm:
                 label = font_sm.render("BUSY", True, (120, 120, 120))
                 self._window.blit(label, (win_w - 42, win_h - 34))
+
+            # WiFi/network LED
+            wifi_led = leds.get("wifi")
+            wifi_on = wifi_led and wifi_led.is_on if wifi_led else False
+            wifi_color = (50, 200, 50) if wifi_on else (60, 60, 55)
+            pygame.draw.circle(self._window, wifi_color, (win_w - 50, win_h - 20), 6)
+            if font_sm:
+                label = font_sm.render("WIFI", True, (120, 120, 120))
+                self._window.blit(label, (win_w - 72, win_h - 34))
 
     def tick(self):
         """Redraw window when new frames are available or status changes."""

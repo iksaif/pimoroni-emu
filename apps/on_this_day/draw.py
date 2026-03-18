@@ -57,6 +57,7 @@ today_year = today_month = today_day = 0
 # Pens (initialized by init)
 BG = TEXT = DIM = HEADER_BG = TIMESCALE_BG = 0
 ERR_PEN = OK_PEN = WHITE = BIRTH_PEN = 0
+YEAR_PEN = TITLE_PEN = ACCENT_PEN = 0
 _fade_bgs = []
 _pen_cache = {}
 
@@ -79,7 +80,7 @@ def init(disp, prest, w, h, year, month, day):
     """Initialize drawing module. Call once after display is ready."""
     global display, presto, WIDTH, HEIGHT, IS_EINK, HAS_TOUCH, layout
     global BG, TEXT, DIM, HEADER_BG, TIMESCALE_BG
-    global ERR_PEN, OK_PEN, WHITE, BIRTH_PEN
+    global ERR_PEN, OK_PEN, WHITE, BIRTH_PEN, YEAR_PEN, TITLE_PEN, ACCENT_PEN
     global today_year, today_month, today_day
 
     display, presto = disp, prest
@@ -89,22 +90,43 @@ def init(disp, prest, w, h, year, month, day):
     IS_EINK = w > 400 and h > 200 and presto is None
     layout = Layout(w, h)
 
-    if DARK_THEME and not IS_EINK:
+    if IS_EINK:
+        # E-ink: high contrast with accent colors where supported
+        BG = display.create_pen(255, 255, 255)
+        TEXT = display.create_pen(0, 0, 0)
+        DIM = display.create_pen(120, 120, 120)
+        HEADER_BG = display.create_pen(255, 255, 255)
+        TIMESCALE_BG = display.create_pen(200, 200, 200)
+        # Use real colors on 7-color e-ink (Inky Frame), muted on B&W (Badger)
+        ERR_PEN = display.create_pen(200, 0, 0)
+        OK_PEN = display.create_pen(0, 120, 0)
+        WHITE = display.create_pen(255, 255, 255)
+        BIRTH_PEN = display.create_pen(200, 100, 0)    # orange
+        YEAR_PEN = display.create_pen(0, 0, 200)       # blue for year
+        TITLE_PEN = display.create_pen(0, 100, 0)      # green for title
+        ACCENT_PEN = display.create_pen(200, 0, 0)     # red accent line
+    elif DARK_THEME:
         BG = display.create_pen(15, 12, 30)
         TEXT = display.create_pen(230, 230, 230)
         DIM = display.create_pen(60, 50, 80)
         HEADER_BG = display.create_pen(25, 20, 50)
         TIMESCALE_BG = display.create_pen(30, 25, 55)
+        ERR_PEN = display.create_pen(255, 80, 80)
+        OK_PEN = display.create_pen(80, 255, 80)
+        WHITE = display.create_pen(255, 255, 255)
+        BIRTH_PEN = display.create_pen(255, 180, 100)
+        YEAR_PEN = TITLE_PEN = ACCENT_PEN = 0  # unused on TFT (HSV pens used instead)
     else:
         BG = display.create_pen(255, 255, 255)
         TEXT = display.create_pen(0, 0, 0)
         DIM = display.create_pen(160, 160, 160)
         HEADER_BG = display.create_pen(235, 235, 240)
         TIMESCALE_BG = display.create_pen(220, 220, 230)
-    ERR_PEN = display.create_pen(255, 80, 80)
-    OK_PEN = display.create_pen(80, 255, 80)
-    WHITE = display.create_pen(255, 255, 255)
-    BIRTH_PEN = display.create_pen(255, 180, 100)
+        ERR_PEN = display.create_pen(255, 80, 80)
+        OK_PEN = display.create_pen(80, 255, 80)
+        WHITE = display.create_pen(255, 255, 255)
+        BIRTH_PEN = display.create_pen(255, 180, 100)
+        YEAR_PEN = TITLE_PEN = ACCENT_PEN = 0
 
     _fade_bgs.clear()
     if not IS_EINK:
@@ -141,7 +163,27 @@ def _word_wrap(text, max_width, scale):
 # ─── Boot screen ─────────────────────────────────────────────────
 
 def boot_screen(message, step, color=None):
-    """Draw a boot progress screen."""
+    """Draw a boot progress screen. On e-ink, just logs to serial."""
+    print("[boot] {}/{}: {}".format(step, 5, message))
+
+    if IS_EINK:
+        # E-ink: don't refresh for every boot step — too slow.
+        # Only show the final "ready" screen.
+        if step < 5:
+            # Try to toggle busy LED on Inky Frame
+            try:
+                from machine import Pin
+                Pin(6, Pin.OUT).value(1)  # Inky Frame activity LED
+            except Exception:
+                pass
+            return
+        else:
+            try:
+                from machine import Pin
+                Pin(6, Pin.OUT).value(0)
+            except Exception:
+                pass
+
     total_steps = 5
     cx = WIDTH // 2
     lo = layout
@@ -213,8 +255,8 @@ def _draw_header(t):
     line_y = lo.header_h - 3
     line_w = WIDTH - lo.margin * 2
     if IS_EINK:
-        display.set_pen(TEXT)
-        display.rectangle(lo.margin, line_y, line_w, 1)
+        display.set_pen(ACCENT_PEN)
+        display.rectangle(lo.margin, line_y, line_w, 2)
     else:
         thickness = 3 if lo.scale_name else 2
         for x in range(0, line_w, 4):
@@ -252,18 +294,25 @@ def _draw_timescale(year, t):
             mx = bar_x + int(bar_w * (mark - TIMESCALE_START_YEAR) / ts_range)
             display.rectangle(mx, bar_y - 2, 1, bar_h + 4)
 
-    # Rainbow fill from event year to now
+    # Fill from event year to now
     event_ratio = max(0.0, min(1.0, (year - TIMESCALE_START_YEAR) / ts_range))
     fill_x = bar_x + int(bar_w * event_ratio)
     fill_w = bar_x + bar_w - fill_x
     if fill_w > 0:
-        for x in range(0, fill_w, 4):
-            w = min(4, fill_w - x)
-            display.set_pen(_hsv_pen((x / max(1, bar_w) * 0.7 + t * 0.02) % 1.0, 0.7, 0.8))
-            display.rectangle(fill_x + x, bar_y + 1, w, bar_h - 2)
+        if IS_EINK:
+            display.set_pen(ACCENT_PEN)
+            display.rectangle(fill_x, bar_y + 1, fill_w, bar_h - 2)
+        else:
+            for x in range(0, fill_w, 4):
+                w = min(4, fill_w - x)
+                display.set_pen(_hsv_pen((x / max(1, bar_w) * 0.7 + t * 0.02) % 1.0, 0.7, 0.8))
+                display.rectangle(fill_x + x, bar_y + 1, w, bar_h - 2)
 
     # Marker dot
-    display.set_pen(_hsv_pen((t * 0.03) % 1.0, 0.8, 1.0))
+    if IS_EINK:
+        display.set_pen(TEXT)
+    else:
+        display.set_pen(_hsv_pen((t * 0.03) % 1.0, 0.8, 1.0))
     display.circle(max(fill_x, bar_x + 4), bar_y + bar_h // 2, 4)
 
     return lo.timescale_h
@@ -295,7 +344,7 @@ def _draw_event(events, idx, t, alpha=1.0):
         year_w = display.measure_text(year_str, scale=scale, spacing=1)
 
         if IS_EINK:
-            display.set_pen(TEXT)
+            display.set_pen(BIRTH_PEN if ev.is_birth else YEAR_PEN)
         elif ev.is_birth:
             display.set_pen(BIRTH_PEN)
         else:
@@ -304,7 +353,10 @@ def _draw_event(events, idx, t, alpha=1.0):
 
         # Decorative dash (large screens)
         if lo.scale_name:
-            display.set_pen(_hsv_pen(hue_base + 0.3, 0.5, 0.6 * alpha))
+            if IS_EINK:
+                display.set_pen(DIM)
+            else:
+                display.set_pen(_hsv_pen(hue_base + 0.3, 0.5, 0.6 * alpha))
             display.rectangle(lo.margin + year_w + 10, y + 4 * scale, 40, 3)
         y += lo.line_height(scale) + 6
 
@@ -316,7 +368,7 @@ def _draw_event(events, idx, t, alpha=1.0):
             truncated = truncated[:-4] + "..."
 
         if IS_EINK:
-            display.set_pen(TEXT)
+            display.set_pen(BIRTH_PEN if ev.is_birth else TITLE_PEN)
         elif ev.is_birth:
             display.set_pen(BIRTH_PEN)
         else:
