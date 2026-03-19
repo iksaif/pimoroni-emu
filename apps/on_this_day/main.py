@@ -12,16 +12,9 @@ from config import (
 )
 
 # ─── Device init ─────────────────────────────────────────────────
-presto = None
-try:
-    from presto import Presto
-    presto = Presto(full_res=True)
-    display = presto.display
-except ImportError:
-    from picographics import PicoGraphics
-    display = PicoGraphics()
-
-WIDTH, HEIGHT = display.get_bounds()
+from display_compat import get_display
+display, presto = get_display()
+WIDTH, HEIGHT = display.width, display.height
 
 # ─── Crash handler ───────────────────────────────────────────────
 from crash import show_crash

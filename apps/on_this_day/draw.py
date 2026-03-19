@@ -83,7 +83,8 @@ def init(disp, prest, w, h, year, month, day):
     global ERR_PEN, OK_PEN, WHITE, BIRTH_PEN, YEAR_PEN, TITLE_PEN, ACCENT_PEN
     global today_year, today_month, today_day
 
-    display, presto = disp, prest
+    display = disp
+    presto = prest
     WIDTH, HEIGHT = w, h
     today_year, today_month, today_day = year, month, day
     HAS_TOUCH = presto is not None
