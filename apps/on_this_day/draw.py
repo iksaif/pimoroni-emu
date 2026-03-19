@@ -14,7 +14,7 @@ class Layout:
                   scale_title=2, scale_year=2, scale_name=0, scale_body=2,
                   scale_body_small=1, scale_ago=1, scale_boot_title=2, scale_boot_msg=1),
         "M": dict(margin=10, header_h=28, timescale_h=18, icon_size=0,
-                  scale_title=2, scale_year=2, scale_name=0, scale_body=2,
+                  scale_title=2, scale_year=2, scale_name=1, scale_body=2,
                   scale_body_small=1, scale_ago=1, scale_boot_title=2, scale_boot_msg=2),
         "L": dict(margin=20, header_h=60, timescale_h=24, icon_size=72,
                   scale_title=4, scale_year=4, scale_name=2, scale_body=3,
