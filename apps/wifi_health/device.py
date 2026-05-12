@@ -21,14 +21,29 @@ class Device:
         self.width = 0
         self.height = 0
 
-    # ── Pen/colour proxies (one function per device family) ────────────
-    def status_leds(self, rgb):
-        """Best-effort: paint ambient LEDs in the given (r, g, b) colour."""
+    # ── Back RGB ring (Presto only) ────────────────────────────────────
+    NUM_LEDS = 7
+
+    def set_leds(self, colors, scale=4):
+        """Paint the back RGB ring.
+
+        Accepts an iterable of up to NUM_LEDS (r, g, b) tuples. `scale`
+        divides each channel — bumps tones down to a wall-bias level
+        rather than glare. No-op on Tufty (no LEDs).
+        """
         if self._presto is None:
             return
-        r, g, b = (c // 4 for c in rgb)        # quarter brightness
-        self._presto.set_all_leds_rgb(r, g, b)
+        for i, rgb in enumerate(list(colors)[: self.NUM_LEDS]):
+            if rgb is None:
+                continue
+            r, g, b = (max(0, min(255, c)) // scale for c in rgb)
+            self._presto.set_led_rgb(i, r, g, b)
         self._presto.set_led_brightness(0.5)
+        self._presto.update_leds()
+
+    def status_leds(self, rgb):
+        """Paint all LEDs in the same colour (back-compat helper)."""
+        self.set_leds([rgb] * self.NUM_LEDS)
 
     # ── Input ──────────────────────────────────────────────────────────
     def read_touch(self):

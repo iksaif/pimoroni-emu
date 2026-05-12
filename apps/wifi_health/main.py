@@ -20,6 +20,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 import current as current_screen
+import leds
 import log as log_screen
 import settings as settings_screen
 import theme
@@ -63,16 +64,6 @@ def _try_connect(device, sampler):
     sampler.tick(force=True)
 
 
-def _status_colour(latest):
-    gw = latest["gateway"]["status"]
-    nt = latest["internet"]["status"]
-    if "down" in (gw, nt):
-        return theme.DOWN
-    if "warn" in (gw, nt):
-        return theme.WARN
-    return theme.FG
-
-
 def _apply_setting(device, sampler, settings_state, key):
     """Push a settings change into the live state."""
     if key == "profile":
@@ -105,10 +96,16 @@ def main():
     last_touch_handled_at = 0.0
     button_prev = {}
 
+    last_led_update = 0.0
     while True:
         # ── Sample ────────────────────────────────────────────────
-        if sampler.tick():
-            device.status_leds(_status_colour(sampler.latest))
+        sampler.tick()
+
+        # ── LEDs (refresh ~3x/s so breathing/flashing animates) ──
+        now = time.time()
+        if now - last_led_update > 0.3:
+            device.set_leds(leds.pattern_for(screen, sampler))
+            last_led_update = now
 
         # ── Frame ─────────────────────────────────────────────────
         display.set_pen(theme.pen(display, theme.BG))
