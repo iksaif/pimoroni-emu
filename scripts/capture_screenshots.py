@@ -4,10 +4,9 @@ Runs each demo app with pygame's dummy video driver, waits for
 the first frame to render, then saves the full window as a screenshot.
 """
 
+import os
 import subprocess
 import sys
-import time
-import os
 
 APPS = [
     ("tufty", "apps/tufty/hello_badge.py"),

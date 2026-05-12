@@ -1,7 +1,8 @@
 """All drawing functions for the On This Day display."""
 
 import math
-from config import DARK_THEME, s, month_name, years_ago_str
+
+from config import DARK_THEME, month_name, s, years_ago_str
 
 
 # ─── Layout profile: all size-dependent values in one place ──────

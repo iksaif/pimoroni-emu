@@ -109,6 +109,7 @@ def _time_is_sane():
 
 
 import machine
+
 rtc = machine.RTC()
 time_source = None
 

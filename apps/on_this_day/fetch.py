@@ -1,9 +1,18 @@
 """Network, data fetching, AI rewrite, and caching."""
 
 import time
+
 from config import (
-    WIFI_SSID, WIFI_PASSWORD, AI_API_KEY, AI_PROVIDER, AI_MODEL, AI_DEFAULTS,
-    KID_AGE, LANGUAGE, LANG_NAMES, capitalize,
+    AI_API_KEY,
+    AI_DEFAULTS,
+    AI_MODEL,
+    AI_PROVIDER,
+    KID_AGE,
+    LANG_NAMES,
+    LANGUAGE,
+    WIFI_PASSWORD,
+    WIFI_SSID,
+    capitalize,
 )
 
 # ─── WiFi ────────────────────────────────────────────────────────
@@ -125,8 +134,9 @@ def ai_rewrite(events_list):
         "Events:\n{events}"
     ).format(age=KID_AGE, lang=lang_name, violence=violence, events="\n".join(lines))
 
-    import urequests
     import json
+
+    import urequests
     try:
         headers = {"Content-Type": "application/json", "Authorization": "Bearer " + AI_API_KEY}
         if AI_PROVIDER == "gemini":

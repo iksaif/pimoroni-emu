@@ -6,13 +6,23 @@ Entry point. Run: python -m emulator --device presto apps/on_this_day/main.py
 import time
 
 from config import (
-    WIFI_SSID, AI_API_KEY, AUTO_CYCLE_SECS, SKIP_BOOT,
-    NORMAL_BRIGHTNESS, DIM_BRIGHTNESS, SLEEP_BRIGHTNESS, SLEEP_AFTER_SECS,
-    s, capitalize, utc_to_local, is_night,
+    AI_API_KEY,
+    AUTO_CYCLE_SECS,
+    DIM_BRIGHTNESS,
+    NORMAL_BRIGHTNESS,
+    SKIP_BOOT,
+    SLEEP_AFTER_SECS,
+    SLEEP_BRIGHTNESS,
+    WIFI_SSID,
+    capitalize,
+    is_night,
+    s,
+    utc_to_local,
 )
 
 # ─── Device init ─────────────────────────────────────────────────
 from display_compat import get_display
+
 display, presto = get_display()
 WIDTH, HEIGHT = display.width, display.height
 
@@ -47,13 +57,14 @@ ICON_DIR = STORAGE_DIR + "/icon_cache"
 
 # ─── Drawing init ────────────────────────────────────────────────
 import draw
+
 now = time.localtime()
 draw.init(display, presto, WIDTH, HEIGHT, now[0], now[1], now[2])
 today_year, today_month, today_day = now[0], now[1], now[2]
 
 # ─── Boot + main loop ───────────────────────────────────────────
 try:
-    from fetch import connect_wifi, is_wifi_connected, fetch_events, ai_rewrite, load_cache, save_cache
+    from fetch import ai_rewrite, connect_wifi, fetch_events, is_wifi_connected, load_cache, save_cache
 
     draw.boot_screen("...", 0)
 

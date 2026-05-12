@@ -47,7 +47,10 @@ SKIP_BOOT = _env.get("SKIP_BOOT", "") != ""
 
 AI_DEFAULTS = {
     "groq": {"url": "https://api.groq.com/openai/v1/chat/completions", "model": "llama-3.3-70b-versatile"},
-    "gemini": {"url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "model": "gemini-2.0-flash"},
+    "gemini": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        "model": "gemini-2.0-flash",
+    },
     "mistral": {"url": "https://api.mistral.ai/v1/chat/completions", "model": "mistral-small-latest"},
 }
 

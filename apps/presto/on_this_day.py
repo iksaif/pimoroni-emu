@@ -600,7 +600,10 @@ def _load_cache():
             return None
         events = []
         for ev in data.get("events", []):
-            events.append((ev.get("year"), ev.get("text", ""), ev.get("icons", []), ev.get("title", ""), ev.get("birth", False)))
+            events.append((
+                ev.get("year"), ev.get("text", ""), ev.get("icons", []),
+                ev.get("title", ""), ev.get("birth", False),
+            ))
         print("[cache] loaded", len(events), "events")
         return events if events else None
     except Exception as e:
@@ -768,7 +771,12 @@ try:
                 events = rewritten
                 boot_screen(_s("ai_rewrite") + " OK !", 4, OK_PEN)
             else:
-                events = [(e[0], _capitalize(e[1]), e[2], e[3] if len(e) > 3 else "", e[4] if len(e) > 4 else False) for e in events]
+                events = [
+                    (e[0], _capitalize(e[1]), e[2],
+                     e[3] if len(e) > 3 else "",
+                     e[4] if len(e) > 4 else False)
+                    for e in events
+                ]
                 boot_screen(last_err or "failed", 4, ERR_PEN)
                 time.sleep(2)
         else:
@@ -939,7 +947,8 @@ try:
         if title and not IS_SMALL and not IS_MEDIUM:
             max_title_w = body_width
             truncated_title = title
-            while display.measure_text(truncated_title, scale=_S_NAME, spacing=1) > max_title_w and len(truncated_title) > 10:
+            while (display.measure_text(truncated_title, scale=_S_NAME, spacing=1) > max_title_w
+                   and len(truncated_title) > 10):
                 truncated_title = truncated_title[:-4] + "..."
             if IS_EINK:
                 display.set_pen(TEXT)

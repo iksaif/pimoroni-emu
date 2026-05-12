@@ -56,6 +56,10 @@ exclude = ["vendor*", "tests*", "apps*"]
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+# vendor/ tracks read-only upstream submodules and contains MicroPython
+# manifest files that use freeze/include/require globals injected by the
+# build tooling — not real Python errors.
+extend-exclude = ["vendor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
