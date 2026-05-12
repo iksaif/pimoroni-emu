@@ -25,6 +25,9 @@ env/
 # Environment
 .env
 *.env
+# MicroPython-style WiFi credentials, never commit
+secrets.py
+**/secrets.py
 
 # Project-specific
 checklist.txt
