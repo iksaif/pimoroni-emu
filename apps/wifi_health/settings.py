@@ -2,7 +2,6 @@
 
 import theme
 
-
 SETTINGS_DEF = [
     {"key": "profile",  "label": "Threshold",       "values": ["LOOSE", "NORMAL", "STRICT"]},
     {"key": "target",   "label": "Ping target",     "values": ["1.1.1.1", "8.8.8.8", "9.9.9.9"]},

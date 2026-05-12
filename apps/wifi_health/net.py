@@ -16,11 +16,10 @@ import os
 import random
 import time
 
-
 try:
     import socket as _socket
 except ImportError:                    # MicroPython: same module name
-    import usocket as _socket          # type: ignore
+    import usocket as _socket  # type: ignore
 
 
 # ─── Mode detection ────────────────────────────────────────────────────

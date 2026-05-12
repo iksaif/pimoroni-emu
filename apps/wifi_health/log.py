@@ -4,7 +4,6 @@ import time
 
 import theme
 
-
 HEATMAP_GAP     = 2
 
 

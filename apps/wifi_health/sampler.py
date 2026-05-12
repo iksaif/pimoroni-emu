@@ -11,7 +11,6 @@ import time
 import net
 import thresholds
 
-
 # ─── Defaults ──────────────────────────────────────────────────────────
 GW_TARGET   = "192.168.1.1"
 NET_TARGET  = "1.1.1.1"

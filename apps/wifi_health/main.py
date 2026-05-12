@@ -26,7 +26,6 @@ import theme
 from device import detect
 from sampler import Sampler
 
-
 VERSION = "v0.4"
 
 

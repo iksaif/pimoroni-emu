@@ -10,7 +10,6 @@ etc. read the per-device values.
 
 import time
 
-
 # ─── Palette (CRT green-phosphor) ──────────────────────────────────────
 BG     = (2, 6, 4)
 FG     = (52, 255, 122)
