@@ -5,10 +5,7 @@ import time
 import theme
 
 
-HEATMAP_CELL_H  = 34
 HEATMAP_GAP     = 2
-ROW_LABEL_W     = 56
-PLOT_HEIGHT     = 110
 
 
 def _status_pen(display, status, dimmed=False):
@@ -26,8 +23,8 @@ def _draw_heatmap_row(display, label, statuses, x, y, w, h, open_idx):
     display.text(label, x, y + (h - 8 * theme.SCALE_BODY) // 2,
                  scale=theme.SCALE_BODY)
 
-    cells_x = x + ROW_LABEL_W
-    cells_w = w - ROW_LABEL_W
+    cells_x = x + theme.ROW_LABEL_W
+    cells_w = w - theme.ROW_LABEL_W
     n = len(statuses)
     cell_w = cells_w / n
     for i, st in enumerate(statuses):
@@ -47,8 +44,8 @@ def _draw_time_axis(display, x, y, w):
     # Labels: now-24h, now-20h, ..., now
     ticks = [now_label, "20", "16", "12", "08", "04", now_label]
     n = len(ticks)
-    cells_x = x + ROW_LABEL_W
-    cells_w = w - ROW_LABEL_W
+    cells_x = x + theme.ROW_LABEL_W
+    cells_w = w - theme.ROW_LABEL_W
     for i, t in enumerate(ticks):
         tx = int(cells_x + (cells_w / (n - 1)) * i)
         tw = display.measure_text(t, scale=theme.SCALE_BODY)
@@ -128,18 +125,18 @@ def draw(display, sampler):
     for i, s in enumerate(slots):
         if s.get("open"):
             open_idx = i
-    _draw_heatmap_row(display, "GW",  gw_statuses,  pad, cursor, content_w, HEATMAP_CELL_H, open_idx)
-    cursor += HEATMAP_CELL_H + HEATMAP_GAP
-    _draw_heatmap_row(display, "NET", net_statuses, pad, cursor, content_w, HEATMAP_CELL_H, open_idx)
-    cursor += HEATMAP_CELL_H + 6
+    _draw_heatmap_row(display, "GW",  gw_statuses,  pad, cursor, content_w, theme.HEATMAP_CELL_H, open_idx)
+    cursor += theme.HEATMAP_CELL_H + HEATMAP_GAP
+    _draw_heatmap_row(display, "NET", net_statuses, pad, cursor, content_w, theme.HEATMAP_CELL_H, open_idx)
+    cursor += theme.HEATMAP_CELL_H + 6
 
     # Time axis
     _draw_time_axis(display, pad, cursor, content_w)
     cursor += 8 * theme.SCALE_BODY + 10
 
     # Ping plot
-    _draw_ping_plot(display, sampler.live_ping(), pad, cursor, content_w, PLOT_HEIGHT)
-    cursor += PLOT_HEIGHT + 8
+    _draw_ping_plot(display, sampler.live_ping(), pad, cursor, content_w, theme.PLOT_HEIGHT)
+    cursor += theme.PLOT_HEIGHT + 8
 
     # Summary line
     warn, down, uptime = sampler.stats()

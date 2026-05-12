@@ -20,7 +20,18 @@ DEFAULTS = {
 class SettingsState:
     def __init__(self):
         self.values = dict(DEFAULTS)
-        self.row_rects = []   # for hit-testing
+        self.row_rects = []
+        self.selected = 0       # index of currently selected row (Tufty)
+
+    def keys(self):
+        return [s["key"] for s in SETTINGS_DEF]
+
+    def move(self, direction):
+        n = len(SETTINGS_DEF)
+        self.selected = (self.selected + direction) % n
+
+    def selected_key(self):
+        return SETTINGS_DEF[self.selected]["key"]
 
     def cycle(self, key, direction=1):
         opts = next(s["values"] for s in SETTINGS_DEF if s["key"] == key)
@@ -33,21 +44,28 @@ class SettingsState:
 
 def draw(display, state):
     pad = theme.PADDING_X
-    y = theme.BODY_TOP + 10
-    row_h = 50
+    touch = theme.DEVICE.has_touch
+    y = theme.BODY_TOP + (10 if touch else 4)
+    row_h = 50 if touch else 28
 
     state.row_rects = []
 
     for i, spec in enumerate(SETTINGS_DEF):
-        # Row background hit-box
-        state.row_rects.append((spec["key"], pad - 4, y, theme.WIDTH - 2 * pad + 8, row_h))
+        state.row_rects.append((spec["key"], pad - 4, y,
+                                theme.WIDTH - 2 * pad + 8, row_h))
 
-        # Label (dim)
-        display.set_pen(theme.pen(display, theme.DIM))
-        display.text(spec["label"], pad, y + (row_h - 8 * theme.SCALE_BODY) // 2,
+        is_sel = (not touch) and (i == state.selected)
+        if is_sel:
+            # Highlight the selected row on Tufty (no touch hint chevrons)
+            display.set_pen(theme.pen(display, (15, 50, 25)))
+            display.rectangle(pad - 4, y, theme.WIDTH - 2 * pad + 8, row_h)
+
+        display.set_pen(theme.pen(display, theme.DIM if not is_sel else theme.FG))
+        display.text(spec["label"], pad,
+                     y + (row_h - 8 * theme.SCALE_BODY) // 2,
                      scale=theme.SCALE_BODY)
 
-        # Value (fg, right-aligned, drawn as `< VALUE >` to hint tappability)
+        # `< VALUE >` chevrons hint that touch (or A) cycles the option
         value = "< " + state.values[spec["key"]] + " >"
         vw = display.measure_text(value, scale=theme.SCALE_BODY)
         display.set_pen(theme.pen(display, theme.FG))
@@ -55,12 +73,10 @@ def draw(display, state):
                      y + (row_h - 8 * theme.SCALE_BODY) // 2,
                      scale=theme.SCALE_BODY)
 
-        # Dashed divider
         theme.dashed_hline(display, y + row_h - 1)
         y += row_h
 
-    # Hint
-    hint = "tap value to cycle"
+    hint = "tap value to cycle" if touch else "UP/DOWN select - A cycle"
     hw = display.measure_text(hint, scale=theme.SCALE_BODY)
     display.set_pen(theme.pen(display, theme.DIM))
     display.text(hint, (theme.WIDTH - hw) // 2,
@@ -69,7 +85,6 @@ def draw(display, state):
 
 
 def hit_test(state, x, y):
-    """Return the key of the row containing (x, y) or None."""
     for key, rx, ry, rw, rh in state.row_rects:
         if rx <= x < rx + rw and ry <= y < ry + rh:
             return key
