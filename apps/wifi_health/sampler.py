@@ -11,6 +11,14 @@ import time
 import net
 import thresholds
 
+
+def _emu_profile():
+    """Read EMU_NETWORK_PROFILE if it exists (CPython emulator only)."""
+    try:
+        return os.environ.get("EMU_NETWORK_PROFILE")
+    except AttributeError:
+        return None
+
 # ─── Defaults ──────────────────────────────────────────────────────────
 GW_TARGET   = "192.168.1.1"
 NET_TARGET  = "1.1.1.1"
@@ -69,11 +77,12 @@ class Sampler:
 
         # When demoing simulated profiles in the emulator, seed plausible
         # 24h history so the Log screen has something to draw immediately.
-        if os.environ.get("EMU_NETWORK_PROFILE") in {"healthy", "degraded", "down"}:
+        # MicroPython has no os.environ, so this is a no-op on hardware.
+        if _emu_profile() in {"healthy", "degraded", "down"}:
             self._seed_demo_history()
 
     def _seed_demo_history(self):
-        profile = os.environ.get("EMU_NETWORK_PROFILE", "healthy")
+        profile = _emu_profile() or "healthy"
         rng = random.Random(42)
         now = _now()
         seed_slot_start = self._slot_start(now) - SLOT_SECONDS * (NUM_SLOTS - 1)

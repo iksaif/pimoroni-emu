@@ -167,7 +167,10 @@ def main():
 
     _try_connect(device, sampler)
 
-    screen = _os.environ.get("WIFI_HEALTH_SCREEN", "current")
+    try:
+        screen = _os.environ.get("WIFI_HEALTH_SCREEN", "current")
+    except AttributeError:
+        screen = "current"  # MicroPython: no environ
     tab_regions = []
 
     # Edge detection state

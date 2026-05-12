@@ -26,8 +26,15 @@ except ImportError:                    # MicroPython: same module name
 
 
 def get_profile():
-    """The active network profile string ('real', 'host', 'healthy', ...)."""
-    return os.environ.get("EMU_NETWORK_PROFILE", "real")
+    """The active network profile string ('real', 'host', 'healthy', ...).
+
+    Reads EMU_NETWORK_PROFILE, set by the emulator. MicroPython's os module
+    has no `environ`, so the lookup falls back to 'real' on real hardware.
+    """
+    try:
+        return os.environ.get("EMU_NETWORK_PROFILE", "real")
+    except AttributeError:
+        return "real"
 
 
 def _profile_sim_params():
