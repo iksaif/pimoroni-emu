@@ -15,9 +15,15 @@ import os as _os
 import sys
 import time
 
-_HERE = _os.path.dirname(_os.path.abspath(__file__))
-if _HERE not in sys.path:
-    sys.path.insert(0, _HERE)
+# CPython emulator: insert the script's directory on sys.path so sibling
+# imports work. MicroPython doesn't ship os.path and modules sit at the
+# filesystem root, so this whole block is a no-op there.
+try:
+    _HERE = _os.path.dirname(_os.path.abspath(__file__))  # type: ignore[attr-defined]
+    if _HERE not in sys.path:
+        sys.path.insert(0, _HERE)
+except (AttributeError, NameError):
+    pass
 
 import current as current_screen
 import leds
@@ -43,24 +49,97 @@ def _mode_label(screen):
     }.get(screen, "")
 
 
+def _draw_boot(device, line, sub=None, spinner_phase=0):
+    """Draw a centred CRT-style boot screen with an animated spinner.
+
+    Called repeatedly during the connect phase so the user has visual
+    feedback while WiFi negotiates.
+    """
+    display = device._display
+    display.set_pen(theme.pen(display, theme.BG))
+    display.clear()
+
+    title = "> WIFI HEALTH"
+    tw = display.measure_text(title, scale=theme.SCALE_BODY)
+    display.set_pen(theme.pen(display, theme.FG))
+    display.text(title, (theme.WIDTH - tw) // 2,
+                 theme.HEIGHT // 2 - 60, scale=theme.SCALE_BODY)
+
+    # Main status line
+    lw = display.measure_text(line, scale=theme.SCALE_BODY)
+    display.set_pen(theme.pen(display, theme.FG))
+    display.text(line, (theme.WIDTH - lw) // 2,
+                 theme.HEIGHT // 2 - 8, scale=theme.SCALE_BODY)
+
+    # Spinner: a row of dots, one of them brightened
+    dots = ".  .  .  .  .  ."
+    dw = display.measure_text(dots, scale=theme.SCALE_BODY)
+    base_x = (theme.WIDTH - dw) // 2
+    display.set_pen(theme.pen(display, theme.DIM))
+    display.text(dots, base_x, theme.HEIGHT // 2 + 24, scale=theme.SCALE_BODY)
+    # Highlight one dot based on phase
+    dot_w = dw // 6
+    hx = base_x + (spinner_phase % 6) * dot_w + dot_w // 2 - 2
+    display.set_pen(theme.pen(display, theme.FG))
+    display.rectangle(hx, theme.HEIGHT // 2 + 28, 6, 6)
+
+    if sub:
+        sw = display.measure_text(sub, scale=theme.SCALE_TINY)
+        display.set_pen(theme.pen(display, theme.DIM))
+        display.text(sub, (theme.WIDTH - sw) // 2,
+                     theme.HEIGHT // 2 + 60, scale=theme.SCALE_TINY)
+
+    device.update()
+
+
+def _boot_leds(device, phase):
+    """Cyan/green sweep around the ring during boot."""
+    colors = []
+    for i in range(device.NUM_LEDS):
+        on = (i == phase % device.NUM_LEDS)
+        colors.append(theme.FG if on else theme.SCAN)
+    device.set_leds(colors)
+
+
 def _try_connect(device, sampler):
-    """Best-effort WiFi connect. Failure is non-fatal."""
+    """Best-effort WiFi connect with on-screen feedback. Failure is non-fatal."""
     try:
-        try:
-            from secrets import WIFI_PASSWORD, WIFI_SSID
-            ssid, password = WIFI_SSID, WIFI_PASSWORD
-        except ImportError:
-            ssid, password = "emulator", ""
-        if device.kind == "presto":
-            device._presto.connect(ssid, password, timeout=10)
-        else:
-            # Tufty: bare network module
-            import network
-            wlan = network.WLAN(network.STA_IF)
-            wlan.active(True)
+        from secrets import WIFI_PASSWORD, WIFI_SSID
+        ssid, password = WIFI_SSID, WIFI_PASSWORD
+    except ImportError:
+        ssid, password = "emulator", ""
+
+    _draw_boot(device, "BOOTING", sub="press any tab to use offline")
+
+    # Spin up WiFi. On Presto we kick connect() and then poll for the
+    # 'connected' state while animating; on Tufty we use bare network.
+    try:
+        import network
+        wlan = network.WLAN(network.STA_IF)
+        wlan.active(True)
+        if not wlan.isconnected():
             wlan.connect(ssid, password)
     except Exception:
-        pass
+        wlan = None
+
+    phase = 0
+    deadline = time.time() + 12.0
+    while wlan is not None and not wlan.isconnected() and time.time() < deadline:
+        _draw_boot(device, "CONNECTING . " + ssid,
+                   sub="WiFi handshake", spinner_phase=phase)
+        _boot_leds(device, phase)
+        phase += 1
+        time.sleep(0.15)
+
+    if wlan is not None and wlan.isconnected():
+        ip = wlan.ifconfig()[0]
+        _draw_boot(device, "ONLINE", sub=ip, spinner_phase=phase)
+        time.sleep(0.5)
+    else:
+        _draw_boot(device, "OFFLINE", sub="probes will report DOWN",
+                   spinner_phase=phase)
+        time.sleep(0.7)
+
     sampler.tick(force=True)
 
 
