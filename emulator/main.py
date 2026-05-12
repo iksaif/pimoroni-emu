@@ -119,6 +119,17 @@ Supported devices: tufty, blinky, presto, badger
     )
 
     parser.add_argument(
+        "--network-profile",
+        choices=["real", "host", "healthy", "degraded", "down"],
+        default="real",
+        help=(
+            "Network telemetry profile. real: pass through host net with drifting "
+            "fake RSSI (default). host: also expose the host machine's real WiFi "
+            "RSSI. healthy/degraded/down: simulated link state."
+        ),
+    )
+
+    parser.add_argument(
         "--hardware",
         action="store_true",
         help="Output to real e-ink hardware (requires: pip install pimoroni-emulator[hardware])",
@@ -267,7 +278,12 @@ def main():
     _emulator_state["app_dir"] = str(app_path.parent.absolute())
     _emulator_state["no_eink_animation"] = args.no_eink_animation
     _emulator_state["no_wifi"] = args.no_wifi
+    _emulator_state["network_profile"] = args.network_profile
     _emulator_state["hardware"] = args.hardware
+
+    # Expose the network profile to apps via env var so portable code can
+    # detect emulator simulation without depending on emulator internals.
+    os.environ["EMU_NETWORK_PROFILE"] = args.network_profile
 
     # Set up memory tracking (before mocks, so tracemalloc captures app allocations)
     memory_tracking = args.memory_tracking or args.strict_memory

@@ -1,8 +1,85 @@
 """Mock implementation of MicroPython's network module."""
 
+import random
+import re
+import subprocess
+import sys
+import time
 from typing import Optional, Tuple
 
 from emulator import get_state
+
+# Centre RSSI per simulated network profile (dBm). Real WiFi RSSI typically
+# sits between -30 (excellent) and -90 (unusable).
+_RSSI_PROFILES = {
+    "real": -52,
+    "host": -52,  # fallback when host RSSI can't be read
+    "healthy": -48,
+    "degraded": -72,
+    "down": -90,
+}
+
+# Cache for host RSSI lookups (subprocess calls are slow).
+_host_rssi_cache: dict = {"value": None, "ts": 0.0}
+
+
+def _read_host_rssi() -> Optional[int]:
+    """Read the host machine's WiFi RSSI in dBm. Best-effort, returns None on failure.
+
+    The macOS `system_profiler` call is slow (3-10s), so results are cached
+    for 30 seconds.
+    """
+    now = time.time()
+    if now - _host_rssi_cache["ts"] < 30.0 and _host_rssi_cache["value"] is not None:
+        return _host_rssi_cache["value"]
+
+    rssi: Optional[int] = None
+    # NOTE: `platform.system()` is overridden by `_patch_os_uname()` to report
+    # as 'rp2', so we use `sys.platform` (unaffected) instead.
+    if sys.platform == "darwin":
+        # `airport -I` is deprecated but still ships on macOS < 15 and runs
+        # without sudo. Fast (<100ms) so try it first.
+        airport = (
+            "/System/Library/PrivateFrameworks/Apple80211.framework"
+            "/Versions/Current/Resources/airport"
+        )
+        try:
+            out = subprocess.run(
+                [airport, "-I"], capture_output=True, text=True, timeout=2
+            ).stdout
+            m = re.search(r"agrCtlRSSI:\s*(-?\d+)", out)
+            if m:
+                rssi = int(m.group(1))
+        except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError):
+            pass
+        if rssi is None:
+            # macOS 15+ removed `airport`; fall back to the slow system_profiler.
+            try:
+                out = subprocess.run(
+                    ["system_profiler", "SPAirPortDataType"],
+                    capture_output=True, text=True, timeout=15,
+                ).stdout
+                m = re.search(r"Signal\s*/\s*Noise:\s*(-?\d+)\s*dBm", out)
+                if m:
+                    rssi = int(m.group(1))
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+    elif sys.platform.startswith("linux"):
+        for cmd in (["iw", "dev"], ["iwconfig"]):
+            try:
+                out = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=2
+                ).stdout
+                m = re.search(r"signal[:\s]+(-?\d+)\s*dBm", out, re.IGNORECASE)
+                if m:
+                    rssi = int(m.group(1))
+                    break
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                continue
+
+    _host_rssi_cache["value"] = rssi
+    _host_rssi_cache["ts"] = now
+    return rssi
 
 # Interface types
 STA_IF = 0
@@ -98,7 +175,18 @@ class WLAN:
     def status(self, param: Optional[str] = None):
         """Get connection status."""
         if param == "rssi":
-            return -50  # Good signal
+            profile = get_state().get("network_profile", "real")
+            if profile == "host":
+                real = _read_host_rssi()
+                if real is not None:
+                    return real
+            centre = _RSSI_PROFILES.get(profile, -52)
+            # Slow sinusoidal drift + small jitter, so monitor apps see a
+            # plausibly live signal rather than a frozen value.
+            t = time.time()
+            drift = 3.0 * ((t % 30) / 30 - 0.5)  # ±1.5 dBm over 30s
+            jitter = random.uniform(-1.0, 1.0)
+            return int(round(centre + drift + jitter))
         if self._connected:
             return STAT_GOT_IP
         return STAT_IDLE
