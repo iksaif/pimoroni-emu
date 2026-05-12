@@ -25,20 +25,20 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "pygame>=2.5.0",
-    "pillow>=10.0.0",
-    "requests>=2.31.0",
-    "watchdog>=3.0.0",
-    "svgelements>=1.9.0",
+    "pygame>=2.6.0",
+    "pillow>=11.0.0",
+    "requests>=2.32.0",
+    "watchdog>=4.0.0",
+    "svgelements>=1.9.6",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.4.0",
-    "numpy>=1.24.0",
+    "pytest>=8.0.0",
+    "numpy>=2.0.0",
 ]
 hardware = [
-    "inky>=2.0.0",
+    "inky>=2.4.0",
 ]
 
 [project.urls]
