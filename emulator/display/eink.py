@@ -488,17 +488,28 @@ class EInkDisplay(BaseDisplay):
         self._refresh_duration = max(0.1, min(2.0, duration))
 
     def init_hardware(self):
-        """Detect and initialize real e-ink HAT for hardware output."""
+        """Detect and initialize real e-ink HAT for hardware output.
+
+        Prefers a pre-resolved device cached by main.py — that path runs
+        the real inky.auto() before our mocks shadow sys.modules['inky.*'],
+        which would otherwise cause auto()'s deferred driver imports to
+        return a mock and silently break the panel refresh. Falls back to
+        a live auto() for direct callers / tests that didn't pre-resolve.
+        """
         state = get_state()
-        real_inky = state.get("real_inky")
-        if not real_inky:
-            return
-        try:
-            self._hw_device = real_inky.auto(ask_user=True, verbose=True)
-            print(f"[Hardware] Detected: {type(self._hw_device).__name__} "
-                  f"{self._hw_device.width}x{self._hw_device.height}")
-        except Exception as e:
-            print(f"[Hardware] Failed to detect e-ink HAT: {e}")
+        self._hw_device = state.get("real_inky_device")
+        if self._hw_device is None:
+            real_inky = state.get("real_inky")
+            if not real_inky:
+                return
+            try:
+                self._hw_device = real_inky.auto(ask_user=True, verbose=True)
+            except Exception as e:
+                print(f"[Hardware] Failed to detect e-ink HAT: {e}")
+                return
+        cls = type(self._hw_device)
+        print(f"[Hardware] Using {cls.__module__}.{cls.__name__} "
+              f"{self._hw_device.width}x{self._hw_device.height}")
 
     def _push_to_hardware(self, buffer):
         """Send framebuffer to real e-ink hardware.

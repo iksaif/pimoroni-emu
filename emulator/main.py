@@ -301,7 +301,11 @@ def main():
               (" + 8MB PSRAM" if device.has_psram else "") +
               (" [strict]" if args.strict_memory else ""))
 
-    # Import real inky library BEFORE mocks overwrite sys.modules
+    # Import real inky library and resolve the panel driver BEFORE mocks
+    # overwrite sys.modules. The real inky.auto() does deferred imports of
+    # `inky.inky_*` driver submodules at call time; if install_inky_mocks
+    # has already shadowed those sys.modules entries, the real auto()
+    # silently returns a mock instance and the panel never refreshes.
     if args.hardware:
         try:
             import inky as _real_inky
@@ -309,6 +313,13 @@ def main():
         except ImportError:
             print("Error: --hardware requires the inky library", file=sys.stderr)
             print("  Install with: pip install pimoroni-emulator[hardware]", file=sys.stderr)
+            return 1
+        try:
+            _emulator_state["real_inky_device"] = _real_inky.auto(
+                ask_user=True, verbose=True
+            )
+        except Exception as e:
+            print(f"[Hardware] Failed to detect e-ink HAT: {e}", file=sys.stderr)
             return 1
 
     # Install mocks based on device type
