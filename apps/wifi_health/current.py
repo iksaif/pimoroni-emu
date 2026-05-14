@@ -29,10 +29,27 @@ def _fmt_dns(v):
     return "{:d}ms".format(int(round(v)))
 
 
-def _fmt_rssi(v):
-    if v is None:
-        return "--dBm"
-    return "{:d}dBm".format(int(v))
+def _rssi_to_pct(dbm):
+    """Map dBm to a 0..100% scale.
+
+    -50 dBm or stronger → 100%, -100 dBm or weaker → 0%, linear between.
+    Matches the bar-meter most operating systems show.
+    """
+    if dbm is None:
+        return None
+    pct = (dbm + 100) * 2
+    if pct < 0:
+        return 0
+    if pct > 100:
+        return 100
+    return pct
+
+
+def _fmt_signal(dbm):
+    pct = _rssi_to_pct(dbm)
+    if pct is None:
+        return "--"
+    return "{:d}%".format(int(pct))
 
 
 def _draw_channel(display, y_top, height, name, channel):
@@ -69,21 +86,28 @@ def _draw_channel(display, y_top, height, name, channel):
                  scale=theme.SCALE_BODY)
 
     # ── Secondary metrics ──────────────────────────────────────────
-    # Presto has space for a 2x2 grid next to the hero number.
-    # Tufty squeezes everything below the hero on a single tight row.
-    metrics = [
-        ("loss " + _fmt_loss(channel["loss_pct"]),  metric_status.get("loss", "ok")),
-        ("dns "  + _fmt_dns(channel["dns_ms"]),     metric_status.get("dns",  "ok")),
-        ("jit "  + _fmt_jit(channel["jitter_ms"]),  metric_status.get("jitter","ok")),
-        ("rssi " + _fmt_rssi(channel["rssi_dbm"]),  metric_status.get("rssi", "ok")),
-    ]
+    # Gateway shows signal strength (it's local). Internet shows DNS time
+    # (it's the upstream story). Each row has three metrics.
+    if name == "GATEWAY":
+        metrics = [
+            ("loss " + _fmt_loss(channel["loss_pct"]),  metric_status.get("loss", "ok")),
+            ("jit "  + _fmt_jit(channel["jitter_ms"]),  metric_status.get("jitter","ok")),
+            ("sig "  + _fmt_signal(channel["rssi_dbm"]), metric_status.get("rssi", "ok")),
+        ]
+    else:
+        metrics = [
+            ("loss " + _fmt_loss(channel["loss_pct"]),  metric_status.get("loss", "ok")),
+            ("dns "  + _fmt_dns(channel["dns_ms"]),     metric_status.get("dns",  "ok")),
+            ("jit "  + _fmt_jit(channel["jitter_ms"]),  metric_status.get("jitter","ok")),
+        ]
 
     if theme.DEVICE.has_touch:
+        # Three metrics laid out as col1/col2 row1 + col1 row2 (the 4th
+        # quadrant is intentionally blank now).
         col1_x, col2_x = pad + 220, pad + 340
         line_y0 = y_top + 36
         line_y1 = line_y0 + 28
-        positions = [(col1_x, line_y0), (col2_x, line_y0),
-                     (col1_x, line_y1), (col2_x, line_y1)]
+        positions = [(col1_x, line_y0), (col2_x, line_y0), (col1_x, line_y1)]
         for (label, st), (x, ly) in zip(metrics, positions):
             display.set_pen(theme.pen(display, theme.status_colour(st)))
             display.text(label, x, ly, scale=theme.SCALE_BODY)

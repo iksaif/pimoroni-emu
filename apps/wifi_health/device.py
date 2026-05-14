@@ -30,6 +30,10 @@ class Device:
         Accepts an iterable of up to NUM_LEDS (r, g, b) tuples. `scale`
         divides each channel — bumps tones down to a wall-bias level
         rather than glare. No-op on Tufty (no LEDs).
+
+        The upstream Presto module only exposes set_led_rgb (it flushes
+        immediately), so we don't try to call set_led_brightness or
+        update_leds here even though the emulator mock has them.
         """
         if self._presto is None:
             return
@@ -38,8 +42,6 @@ class Device:
                 continue
             r, g, b = (max(0, min(255, c)) // scale for c in rgb)
             self._presto.set_led_rgb(i, r, g, b)
-        self._presto.set_led_brightness(0.5)
-        self._presto.update_leds()
 
     def status_leds(self, rgb):
         """Paint all LEDs in the same colour (back-compat helper)."""

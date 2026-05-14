@@ -36,6 +36,36 @@ from sampler import Sampler
 VERSION = "v0.4"
 
 
+# ─── Logging ─────────────────────────────────────────────────────────
+LOG_PATH = "/wifi_health.log"
+_LOG_F = None
+
+
+def _log(msg):
+    """Append a line to both stdout and the on-device log file.
+
+    Lets us debug after a reboot without needing a live serial session.
+    """
+    line = "[wh] " + msg
+    print(line)
+    global _LOG_F
+    try:
+        if _LOG_F is None:
+            _LOG_F = open(LOG_PATH, "a")
+        _LOG_F.write(line + "\n")
+        _LOG_F.flush()
+    except Exception:
+        _LOG_F = None
+
+
+def _log_rotate():
+    try:
+        with open(LOG_PATH, "w") as f:
+            f.write("--- boot ---\n")
+    except Exception:
+        pass
+
+
 def _hms():
     t = time.localtime()
     return "{:02d}:{:02d}".format(t[3], t[4])
@@ -109,10 +139,6 @@ def _try_connect(device, sampler):
     except ImportError:
         ssid, password = "emulator", ""
 
-    _draw_boot(device, "BOOTING", sub="press any tab to use offline")
-
-    # Spin up WiFi. On Presto we kick connect() and then poll for the
-    # 'connected' state while animating; on Tufty we use bare network.
     try:
         import network
         wlan = network.WLAN(network.STA_IF)
@@ -122,11 +148,18 @@ def _try_connect(device, sampler):
     except Exception:
         wlan = None
 
+    # Always animate for ≥ MIN_FRAMES so the loader is visible even when
+    # the radio has cached credentials and associates in <300 ms.
+    MIN_FRAMES = 10           # 10 * 0.15s ≈ 1.5s minimum dwell
+    MAX_FRAMES = 80           # ≈ 12s ceiling — give up after that
     phase = 0
-    deadline = time.time() + 12.0
-    while wlan is not None and not wlan.isconnected() and time.time() < deadline:
-        _draw_boot(device, "CONNECTING . " + ssid,
-                   sub="WiFi handshake", spinner_phase=phase)
+    while phase < MAX_FRAMES:
+        connected = wlan is not None and wlan.isconnected()
+        if phase >= MIN_FRAMES and connected:
+            break
+        line = "CONNECTING . " + ssid if not connected else "WIFI OK"
+        sub = "WiFi handshake" if not connected else wlan.ifconfig()[0]
+        _draw_boot(device, line, sub=sub, spinner_phase=phase)
         _boot_leds(device, phase)
         phase += 1
         time.sleep(0.15)
@@ -134,11 +167,11 @@ def _try_connect(device, sampler):
     if wlan is not None and wlan.isconnected():
         ip = wlan.ifconfig()[0]
         _draw_boot(device, "ONLINE", sub=ip, spinner_phase=phase)
-        time.sleep(0.5)
+        time.sleep(0.6)
     else:
         _draw_boot(device, "OFFLINE", sub="probes will report DOWN",
                    spinner_phase=phase)
-        time.sleep(0.7)
+        time.sleep(0.8)
 
     sampler.tick(force=True)
 
@@ -156,16 +189,27 @@ def _apply_setting(device, sampler, settings_state, key):
 
 
 def main():
-    device = detect()
+    _log_rotate()
+    _log("main() entered")
+    try:
+        device = detect()
+    except Exception as e:
+        _log("detect() failed: " + repr(e))
+        raise
+    _log("device kind={} size={}x{} touch={}".format(
+        device.kind, device.width, device.height, device.has_touch))
     display = device._display
     theme.init(device)
     display.set_font("bitmap8")
     device.set_backlight(0.8)
+    _log("display+theme initialised, backlight set")
 
     sampler = Sampler(profile="NORMAL")
     settings_state = settings_screen.SettingsState()
+    _log("sampler+settings ready")
 
     _try_connect(device, sampler)
+    _log("_try_connect returned")
 
     try:
         screen = _os.environ.get("WIFI_HEALTH_SCREEN", "current")
@@ -179,6 +223,8 @@ def main():
     button_prev = {}
 
     last_led_update = 0.0
+    frame_count = 0
+    _log("entering main loop, initial screen={}".format(screen))
     while True:
         # ── Sample ────────────────────────────────────────────────
         sampler.tick()
@@ -208,6 +254,9 @@ def main():
                      scale=theme.SCALE_TINY)
 
         device.update()
+        frame_count += 1
+        if frame_count <= 3 or frame_count % 60 == 0:
+            _log("frame {} screen={}".format(frame_count, screen))
 
         # ── Input ─────────────────────────────────────────────────
         if device.has_touch:
@@ -260,4 +309,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as _e:
+        import sys
+        _log("FATAL: " + repr(_e))
+        try:
+            sys.print_exception(_e)
+        except Exception:
+            pass
+        raise

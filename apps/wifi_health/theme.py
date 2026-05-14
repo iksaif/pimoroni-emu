@@ -10,6 +10,17 @@ etc. read the per-device values.
 
 import time
 
+# MicroPython's time.time() is integer-seconds; ticks_ms gives sub-second
+# resolution for animations. Fall back to wall-clock on CPython.
+_HAS_TICKS_MS = hasattr(time, "ticks_ms")
+
+
+def _ms_phase(period_ms):
+    """Return phase in [0, 1) over a period_ms cycle."""
+    if _HAS_TICKS_MS:
+        return (time.ticks_ms() % period_ms) / period_ms
+    return (time.time() % (period_ms / 1000.0)) / (period_ms / 1000.0)
+
 # ─── Palette (CRT green-phosphor) ──────────────────────────────────────
 BG     = (2, 6, 4)
 FG     = (52, 255, 122)
@@ -167,7 +178,7 @@ def status_pill(display, x_right, y, status, height=None):
 
 
 def cursor_visible():
-    return (time.time() % 1.0) < 0.5
+    return _ms_phase(1000) < 0.5
 
 
 # ─── Header / footer ───────────────────────────────────────────────────

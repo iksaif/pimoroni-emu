@@ -15,8 +15,6 @@ so the device gives an at-a-glance health read even when you're not
 looking directly at the LCD.
 """
 
-import time
-
 import theme
 
 
@@ -48,8 +46,8 @@ def for_log(sampler):
 
 def for_settings():
     """Calm 4-second dim-green breath while the user fiddles with options."""
-    phase = (time.time() % 4.0) / 4.0          # 0 → 1
-    breath = 0.3 + 0.7 * (1 - abs(phase * 2 - 1))   # triangle wave 0.3..1.0
+    phase = theme._ms_phase(4000)                   # 0 → 1
+    breath = 0.3 + 0.7 * (1 - abs(phase * 2 - 1))   # triangle 0.3..1.0
     return [_dim(theme.DIM, breath)] * 7
 
 
@@ -58,8 +56,8 @@ def alarm(sampler):
     gw = sampler.latest["gateway"]["status"]
     nt = sampler.latest["internet"]["status"]
     if gw != "down" or nt != "down":
-        return None  # caller falls back to the per-screen pattern
-    on = (time.time() % 1.0) < 0.5
+        return None
+    on = theme._ms_phase(1000) < 0.5
     return [theme.DOWN if on else (0, 0, 0)] * 7
 
 

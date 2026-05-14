@@ -22,6 +22,24 @@ except ImportError:                    # MicroPython: same module name
     import usocket as _socket  # type: ignore
 
 
+# MicroPython's time.time() returns integer seconds, which rounds every
+# sub-second probe to 0ms. Use ticks_ms when available (RP2350) and fall
+# back to monotonic float seconds in the CPython emulator.
+_HAS_TICKS_MS = hasattr(time, "ticks_ms")
+
+
+def _now_ms():
+    if _HAS_TICKS_MS:
+        return time.ticks_ms()
+    return time.time() * 1000.0
+
+
+def _elapsed_ms(start):
+    if _HAS_TICKS_MS:
+        return time.ticks_diff(time.ticks_ms(), start)
+    return time.time() * 1000.0 - start
+
+
 # ─── Mode detection ────────────────────────────────────────────────────
 
 
@@ -62,24 +80,26 @@ def _tcp_ping(host, port=53, timeout=1.0):
         s = _socket.socket(family, _socket.SOCK_STREAM)
         try:
             s.settimeout(timeout)
-            t0 = time.time()
+            t0 = _now_ms()
             s.connect(sockaddr)
-            return (time.time() - t0) * 1000.0
+            return _elapsed_ms(t0)
         finally:
             try:
                 s.close()
             except Exception:
                 pass
-    except (OSError, _socket.gaierror, Exception):
+    except Exception:
+        # OSError, socket.gaierror, ssl errors — MicroPython doesn't expose
+        # all of them as named attrs, so we just catch everything.
         return None
 
 
 def _real_dns_ms(name="cloudflare.com"):
     """Measure DNS resolution time in ms. Returns None on failure."""
     try:
-        t0 = time.time()
+        t0 = _now_ms()
         _socket.getaddrinfo(name, 0)
-        return (time.time() - t0) * 1000.0
+        return _elapsed_ms(t0)
     except Exception:
         return None
 

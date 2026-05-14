@@ -20,9 +20,21 @@ def _emu_profile():
         return None
 
 # ─── Defaults ──────────────────────────────────────────────────────────
-GW_TARGET   = "192.168.1.1"
+GW_TARGET   = "192.168.1.1"     # fallback if WLAN doesn't report a gateway
 NET_TARGET  = "1.1.1.1"
 DNS_NAME    = "cloudflare.com"
+
+
+def _discover_gateway():
+    """Read the gateway IP from the active WLAN. Returns None if unavailable."""
+    try:
+        import network
+        wlan = network.WLAN(network.STA_IF)
+        if wlan.isconnected():
+            return wlan.ifconfig()[2]
+    except Exception:
+        pass
+    return None
 
 SAMPLE_PERIOD_S = 5
 LOSS_WINDOW     = 20
@@ -60,7 +72,7 @@ class Sampler:
 
     def __init__(self, profile="NORMAL"):
         self.profile = profile
-        self.gw_target = GW_TARGET
+        self.gw_target = _discover_gateway() or GW_TARGET
         self.net_target = NET_TARGET
         self.sample_period = SAMPLE_PERIOD_S
         self.dns_name = DNS_NAME
@@ -185,7 +197,11 @@ class Sampler:
             "dns":     thresholds.classify("dns", dns_ms, self.profile),
             "rssi":    thresholds.classify("rssi", rssi_dbm, self.profile),
         }
-        status = thresholds.channel_status(list(metric_status.values()))
+        # The pill tracks latency only. Other metrics still show their own
+        # colour individually but don't drag the channel-level status DOWN —
+        # a weak signal or slow DNS shouldn't mark the link as offline
+        # while pings are still landing.
+        status = metric_status["latency"]
         return {
             "target": target,
             "latency_ms": latency_ms,
@@ -208,7 +224,9 @@ class Sampler:
         self._last_sample_ts = now
 
         # DNS is a global probe — both channels share its result.
-        gw_res  = net.probe(self.gw_target, port=53)
+        # Gateway: port 80 (router admin UI is much more likely to be open
+        # than 53). Internet: port 53 (Cloudflare/Google DNS listen there).
+        gw_res  = net.probe(self.gw_target, port=80)
         net_res = net.probe(self.net_target, port=53, dns_name=self.dns_name)
         dns_ms  = net_res["dns_ms"]
         rssi    = net.rssi_dbm()
