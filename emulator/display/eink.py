@@ -505,7 +505,9 @@ class EInkDisplay(BaseDisplay):
             try:
                 self._hw_device = real_inky.auto(ask_user=True, verbose=True)
             except Exception as e:
-                print(f"[Hardware] Failed to detect e-ink HAT: {e}")
+                import traceback
+                print(f"[Hardware] Failed to detect e-ink HAT: {e!r}")
+                traceback.print_exc()
                 return
         cls = type(self._hw_device)
         print(f"[Hardware] Using {cls.__module__}.{cls.__name__} "
@@ -516,7 +518,17 @@ class EInkDisplay(BaseDisplay):
 
         Uses BaseDisplay._buffer_to_image (clean RGB, no dithering/tinting)
         because the real inky library handles palette quantization itself.
+
+        Entry/success traces are gated on --trace so the log stays quiet
+        for normal runs. Errors always print (with traceback) since those
+        are bugs, not diagnostics.
         """
+        import time as _stdlib_time
+        trace_on = bool(get_state().get("trace"))
+        t0 = _stdlib_time.monotonic()
+        if trace_on:
+            print(f"[Hardware] _push_to_hardware: entering, buffer={len(buffer)} rows",
+                  flush=True)
         try:
             # Get clean RGB image via the base class (not the EInk override
             # which applies emulator-specific dithering and paper tinting)
@@ -530,11 +542,21 @@ class EInkDisplay(BaseDisplay):
             self._hw_device.set_border(self._hw_device.BLACK)
             self._hw_device.set_image(image, saturation=0.5)
             self._hw_device.show()
-
-            if get_state().get("trace"):
-                print("[Hardware] Frame pushed to e-ink HAT")
         except Exception as e:
-            print(f"[Hardware] Error pushing frame: {e}")
+            import traceback
+            elapsed = (_stdlib_time.monotonic() - t0) * 1000
+            print(
+                f"[Hardware] Error pushing frame after {elapsed:.0f}ms: {e!r}",
+                flush=True,
+            )
+            traceback.print_exc()
+            return
+        if trace_on:
+            elapsed = (_stdlib_time.monotonic() - t0) * 1000
+            print(
+                f"[Hardware] Frame pushed to e-ink HAT  ({elapsed:.0f}ms)",
+                flush=True,
+            )
 
     def _buffer_to_image(self, buffer):
         """Convert e-ink framebuffer to PIL Image.

@@ -296,8 +296,10 @@ def _try_download_font(name: str) -> Optional[BitmapFont]:
     if cache_file.exists():
         try:
             return _load_cached_font(cache_file, name)
-        except Exception:
-            pass
+        except Exception as e:
+            import sys
+            print(f"[fonts] Cached font {name} unreadable, will re-download: {e!r}",
+                  file=sys.stderr)
 
     # Download from GitHub
     url = f"https://raw.githubusercontent.com/pimoroni/pimoroni-pico/main/libraries/bitmap_fonts/{name}_data.hpp"

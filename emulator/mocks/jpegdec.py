@@ -33,8 +33,8 @@ class JPEG:
                 print(f"[JPEG] Opened {filename}: {self._image.size}")
             return 1  # Success
         except Exception as e:
-            if get_state().get("trace"):
-                print(f"[JPEG] Failed to open {filename}: {e}")
+            import sys
+            print(f"[JPEG] Failed to open {filename}: {e!r}", file=sys.stderr)
             return 0  # Failure
 
     def open_RAM(self, data: bytes) -> int:
@@ -47,8 +47,8 @@ class JPEG:
                 print(f"[JPEG] Opened from RAM: {self._image.size}")
             return 1
         except Exception as e:
-            if get_state().get("trace"):
-                print(f"[JPEG] Failed to open from RAM: {e}")
+            import sys
+            print(f"[JPEG] Failed to open from RAM: {e!r}", file=sys.stderr)
             return 0
 
     def decode(

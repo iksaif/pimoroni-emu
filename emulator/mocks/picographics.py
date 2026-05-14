@@ -426,8 +426,9 @@ class PicoGraphics:
                 print(f"[PicoGraphics] Loaded spritesheet {img.width}x{img.height}, "
                       f"{self._spritesheet_width} cols")
         except Exception as e:
-            if state.get("trace"):
-                print(f"[PicoGraphics] Failed to load spritesheet: {e}")
+            import sys
+            print(f"[PicoGraphics] Failed to load spritesheet: {e!r}",
+                  file=sys.stderr)
 
     def sprite(self, index: int, x: int, y: int, *args):
         """Draw an 8x8 sprite from the loaded spritesheet."""

@@ -124,7 +124,9 @@ class Buzzer:
                 pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
             self._audio_init = True
             return True
-        except Exception:
+        except Exception as e:
+            import sys
+            print(f"[pimoroni] Audio init failed: {e!r}", file=sys.stderr)
             return False
 
     def _generate_tone(self, freq: int, duty: float = 0.5):

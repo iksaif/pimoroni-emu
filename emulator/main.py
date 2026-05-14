@@ -315,12 +315,16 @@ def main():
             print("  Install with: pip install pimoroni-emulator[hardware]", file=sys.stderr)
             return 1
         try:
-            _emulator_state["real_inky_device"] = _real_inky.auto(
-                ask_user=True, verbose=True
-            )
+            _hw = _real_inky.auto(ask_user=True, verbose=True)
         except Exception as e:
-            print(f"[Hardware] Failed to detect e-ink HAT: {e}", file=sys.stderr)
+            import traceback
+            print(f"[Hardware] Failed to detect e-ink HAT: {e!r}", file=sys.stderr)
+            traceback.print_exc()
             return 1
+        # Wrap in a call tracer so every set_image/show/etc. shows up in
+        # the log — invaluable when the panel "doesn't do anything".
+        from emulator.hardware.tracer import HardwareTracer
+        _emulator_state["real_inky_device"] = HardwareTracer(_hw)
 
     # Install mocks based on device type
     library_type = getattr(device, 'library_type', None)

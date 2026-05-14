@@ -114,7 +114,9 @@ class DeviceTest(TestCase):
                 runpy.run_path(str(app_path), run_name="__main__")
             except Exception as e:
                 if _emulator_state["running"]:
-                    print(f"App error: {e}")
+                    import traceback
+                    print(f"App error: {e!r}")
+                    traceback.print_exc()
 
         self._app_thread = threading.Thread(target=run_app, daemon=True)
         self._app_thread.start()

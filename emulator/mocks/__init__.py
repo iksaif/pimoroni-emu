@@ -15,6 +15,39 @@ _vfs_enabled = False
 _vfs_root = None
 
 
+# Stdlib modules that real CPython libraries (e.g. inky) call into at
+# runtime. When --hardware is on, replacing these with MicroPython mocks
+# can break the real library silently (e.g. a mock time.sleep that
+# no-ops the BUSY-pin polling inside inky.show()).
+_HW_BREAKING_STDLIB = {
+    "time", "gc", "threading", "socket", "ssl",
+    "asyncio", "signal", "select", "selectors", "errno",
+}
+
+
+def _warn_if_shadowing_stdlib(names):
+    """Emit a single noisy warning per install_mocks() call.
+
+    Lists every concerning stdlib module our mocks are about to overwrite
+    in sys.modules. Only fires when --hardware is set, since that's the
+    only time replacing stdlib is likely to cause silent breakage.
+    """
+    from emulator import get_state
+    state = get_state()
+    if not state.get("hardware"):
+        return
+    bad = [n for n in names if n in _HW_BREAKING_STDLIB]
+    if not bad:
+        return
+    print(
+        f"[mocks] WARNING: --hardware is set, but installing mocks for "
+        f"stdlib modules {bad!r}. Real CPython libraries (e.g. inky) that "
+        f"call into these at runtime may misbehave silently. If your panel "
+        f"doesn't refresh, this is the first thing to investigate.",
+        file=sys.stderr,
+    )
+
+
 def _translate_path(path: str) -> str:
     """Translate MicroPython absolute path to host filesystem path.
 
@@ -224,6 +257,10 @@ def install_mocks(device_name=None):
     from emulator.mocks import socket as mock_socket
     from emulator.mocks import time as mock_time
 
+    # Warn loudly if --hardware is on; mocking stdlib silently breaks
+    # real CPython libraries (e.g. inky.show()'s BUSY-pin sleep loop).
+    _warn_if_shadowing_stdlib(["time", "gc"])
+
     # Core MicroPython modules
     sys.modules["machine"] = machine
     sys.modules["time"] = mock_time
@@ -395,6 +432,8 @@ def install_badgeware_mocks():
     from emulator.mocks import micropython as mock_micropython
     from emulator.mocks import socket as mock_socket
     from emulator.mocks import time as mock_time
+
+    _warn_if_shadowing_stdlib(["time", "gc"])
 
     # Core MicroPython modules
     sys.modules["machine"] = machine

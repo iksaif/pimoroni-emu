@@ -157,3 +157,131 @@ def test_install_inky_mocks_then_init_hardware_keeps_real_driver():
     display.render(_blank_buffer())
     assert hw.show_calls == 1, "show() was not called on the real driver"
     assert hw.set_image_calls == 1, "set_image was not called on the real driver"
+
+
+# ───────────────────────── HardwareTracer ────────────────────────────
+
+def test_hardware_tracer_forwards_calls_and_returns_values():
+    """Tracer must transparently forward calls and return whatever the
+    wrapped object returned."""
+    from emulator.hardware.tracer import HardwareTracer
+
+    class FakeDriver:
+        width = 800
+        height = 480
+        BLACK = 0
+
+        def __init__(self):
+            self.calls = []
+
+        def set_image(self, image, saturation=0.5):
+            self.calls.append(("set_image", saturation))
+            return None
+
+        def show(self, busy_wait=True):
+            self.calls.append(("show", busy_wait))
+            return 42  # nonsense return — we want to confirm passthrough
+
+    inner = FakeDriver()
+    tracer = HardwareTracer(inner)
+
+    # Attribute reads pass through silently.
+    assert tracer.width == 800
+    assert tracer.BLACK == 0
+
+    # Method calls forward and return the wrapped result.
+    assert tracer.set_image("img", saturation=0.7) is None
+    assert tracer.show(busy_wait=False) == 42
+    assert inner.calls == [("set_image", 0.7), ("show", False)]
+
+
+def test_hardware_tracer_logs_each_call(capsys):
+    """When --trace is on, each method call produces entry+exit log lines."""
+    from emulator.hardware.tracer import HardwareTracer
+
+    class FakeDriver:
+        def show(self):
+            return None
+
+    _emulator_state["trace"] = True
+    tracer = HardwareTracer(FakeDriver())
+    tracer.show()
+
+    out = capsys.readouterr().out
+    assert "[Hardware] -> show()" in out, f"missing entry line. got:\n{out}"
+    assert "[Hardware] <- show -> None" in out, f"missing exit line. got:\n{out}"
+
+
+def test_hardware_tracer_silent_without_trace(capsys):
+    """When --trace is off, the tracer must not print entry/exit lines."""
+    from emulator.hardware.tracer import HardwareTracer
+
+    class FakeDriver:
+        def show(self):
+            return None
+
+    _emulator_state["trace"] = False
+    tracer = HardwareTracer(FakeDriver())
+    tracer.show()
+
+    out = capsys.readouterr().out
+    assert "[Hardware]" not in out, f"tracer printed without --trace:\n{out}"
+
+
+def test_hardware_tracer_logs_exception_with_elapsed_then_reraises(capsys):
+    """When the wrapped method raises, we log it (with type, message,
+    elapsed time) and let the exception propagate. Errors must surface
+    *regardless* of --trace — they're not diagnostics."""
+    from emulator.hardware.tracer import HardwareTracer
+
+    class FakeDriver:
+        def show(self):
+            raise RuntimeError("panel offline")
+
+    _emulator_state["trace"] = False  # explicitly off
+    tracer = HardwareTracer(FakeDriver())
+    with pytest.raises(RuntimeError, match="panel offline"):
+        tracer.show()
+
+    out = capsys.readouterr().out
+    assert "[Hardware] !!" in out, f"errors should surface even with --trace off:\n{out}"
+    assert "show" in out
+    assert "RuntimeError" in out
+    assert "panel offline" in out
+
+
+# ──────────────────── stdlib shadow warnings ─────────────────────────
+
+def test_warn_if_shadowing_stdlib_fires_only_with_hardware(capsys):
+    """The warning helper must stay quiet when --hardware is off and
+    fire on stderr when it's on, listing every concerning module name."""
+    from emulator.mocks import _warn_if_shadowing_stdlib
+
+    # No warning when --hardware is unset.
+    _emulator_state["hardware"] = False
+    _warn_if_shadowing_stdlib(["time", "gc"])
+    err = capsys.readouterr().err
+    assert err == "", f"unexpected warning when --hardware off:\n{err}"
+
+    # Warning when --hardware is set, listing the concerning names.
+    _emulator_state["hardware"] = True
+    _warn_if_shadowing_stdlib(["time", "gc", "picographics"])
+    err = capsys.readouterr().err
+    assert "WARNING" in err
+    assert "'time'" in err
+    assert "'gc'" in err
+    # Non-stdlib mock names shouldn't be listed.
+    assert "picographics" not in err
+
+
+def test_install_mocks_emits_shadow_warning_under_hardware(capsys):
+    """The real install_mocks() must trigger the warning when --hardware is set."""
+    from emulator.mocks import install_mocks
+
+    _emulator_state["hardware"] = True
+    install_mocks(device_name="inky_impression")
+
+    err = capsys.readouterr().err
+    assert "WARNING" in err, f"expected shadow warning, got stderr:\n{err}"
+    assert "time" in err
+    assert "gc" in err
