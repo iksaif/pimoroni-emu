@@ -104,6 +104,39 @@ When an app creates a QwSTPad instance, a clickable gamepad widget appears below
 - **Z / X / C / V** - Face buttons (A/B/X/Y)
 - **= / -** - Plus/Minus buttons
 
+### Running on a real Raspberry Pi with `--hardware`
+
+For Inky HATs on a real Raspberry Pi, `--hardware` routes the emulator's
+framebuffer to the physical panel via the upstream `inky` library:
+
+```bash
+pip install 'pimoroni-emulator[hardware]'
+pimoroni-emulator --device inky_impression_73 --hardware --headless main.py
+```
+
+`--headless` is recommended (and auto-enabled when no display server is
+available); add `--trace` to see every call to the real HAT (entry, args,
+return value, elapsed time).
+
+#### Bookworm: the SPI overlay
+
+On Raspberry Pi OS **Bookworm**, the default device tree reserves the
+SPI0 CE0/CE1 GPIOs as hardware chip-selects. On 7.3" Impression HATs
+that GPIO is also the BUSY pin `inky.show()` polls — so `show()` blocks
+forever (or returns silently with no flicker) until you free the pins.
+
+Add `dtoverlay=spi0-0cs` to `/boot/firmware/config.txt` and reboot:
+
+```bash
+sudo cp /boot/firmware/config.txt /boot/firmware/config.txt.bak
+echo "dtoverlay=spi0-0cs" | sudo tee -a /boot/firmware/config.txt
+sudo reboot
+```
+
+Symptom if missing: with `--trace`, you'll see `[Hardware] -> show()`
+followed by no `<- show` line for minutes. The wiring on our side is
+fine — userspace just can't read BUSY.
+
 ## Compatibility matrix
 
 ### Devices

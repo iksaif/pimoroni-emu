@@ -135,6 +135,13 @@ Supported devices: tufty, blinky, presto, badger
         help="Output to real e-ink hardware (requires: pip install pimoroni-emulator[hardware])",
     )
 
+    parser.add_argument(
+        "--hardware-test",
+        action="store_true",
+        help="With --hardware: push a solid-colour test frame at startup "
+             "and exit. Verifies the panel + wiring before running an app.",
+    )
+
     return parser.parse_args()
 
 
@@ -205,26 +212,34 @@ def main():
         _print_device_table()
         return 0
 
-    # Require app path
-    if not args.app:
+    # Require app path (--hardware-test runs without an app)
+    if not args.app and not args.hardware_test:
         print("Error: App path is required", file=sys.stderr)
         print("Usage: python -m emulator --device <device> <app.py>", file=sys.stderr)
         return 1
 
-    # Check app exists and is a Python file
-    app_path = Path(args.app)
-    if not app_path.exists():
-        print(f"Error: App not found: {app_path}", file=sys.stderr)
+    if args.hardware_test and not args.hardware:
+        print("Error: --hardware-test requires --hardware", file=sys.stderr)
         return 1
 
-    if app_path.suffix.lower() != ".py":
-        print(f"Error: App must be a Python file (.py), got: {app_path.suffix}", file=sys.stderr)
-        print(f"  Did you mean: {app_path.stem}.py?", file=sys.stderr)
-        return 1
+    # Check app exists and is a Python file (skipped for --hardware-test)
+    if args.app:
+        app_path = Path(args.app)
+        if not app_path.exists():
+            print(f"Error: App not found: {app_path}", file=sys.stderr)
+            return 1
+
+        if app_path.suffix.lower() != ".py":
+            print(f"Error: App must be a Python file (.py), got: {app_path.suffix}",
+                  file=sys.stderr)
+            print(f"  Did you mean: {app_path.stem}.py?", file=sys.stderr)
+            return 1
+    else:
+        app_path = None
 
     # Auto-detect device from app path if using default
     device_name = args.device
-    if device_name == "presto":  # Default value - try to auto-detect
+    if device_name == "presto" and app_path is not None:  # Default - try to auto-detect
         app_path_str = str(app_path).lower()
         if "blinky" in app_path_str:
             device_name = "blinky"
@@ -255,7 +270,8 @@ def main():
 
     print(f"Starting emulator for {device.name}")
     print(f"  Display: {device.display_width}x{device.display_height} {device.display_type}")
-    print(f"  App: {app_path}")
+    if app_path is not None:
+        print(f"  App: {app_path}")
 
     # Auto-headless when using --hardware without a display server (e.g. RPi over SSH)
     if args.hardware and not args.headless:
@@ -275,7 +291,7 @@ def main():
     _emulator_state["headless"] = args.headless
     _emulator_state["trace"] = args.trace
     _emulator_state["max_frames"] = args.max_frames
-    _emulator_state["app_dir"] = str(app_path.parent.absolute())
+    _emulator_state["app_dir"] = str(app_path.parent.absolute()) if app_path else ""
     _emulator_state["no_eink_animation"] = args.no_eink_animation
     _emulator_state["no_wifi"] = args.no_wifi
     _emulator_state["network_profile"] = args.network_profile
@@ -345,7 +361,7 @@ def main():
         print("  Library: picographics (MicroPython)")
 
     # Set up virtual filesystem for badger apps
-    if "badger" in str(app_path).lower():
+    if app_path is not None and "badger" in str(app_path).lower():
         setup_vfs(str(app_path))
         print("  VFS: enabled (badger_os filesystem)")
 
@@ -372,6 +388,11 @@ def main():
         if hasattr(display, 'init_hardware'):
             display.init_hardware()
         print("  Hardware: enabled (real e-ink output)")
+
+    # --hardware-test: push one test frame, then exit.
+    if args.hardware_test:
+        from emulator.hardware.self_test import run_hardware_self_test
+        return run_hardware_self_test(display, device)
 
     # Set up hardware managers
     button_manager = ButtonManager(device)

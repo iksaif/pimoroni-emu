@@ -253,35 +253,115 @@ def test_hardware_tracer_logs_exception_with_elapsed_then_reraises(capsys):
 # ──────────────────── stdlib shadow warnings ─────────────────────────
 
 def test_warn_if_shadowing_stdlib_fires_only_with_hardware(capsys):
-    """The warning helper must stay quiet when --hardware is off and
-    fire on stderr when it's on, listing every concerning module name."""
+    """The note must stay quiet when --hardware is off and fire on
+    stderr when it's on, listing every concerning module name."""
     from emulator.mocks import _warn_if_shadowing_stdlib
 
-    # No warning when --hardware is unset.
+    # No output when --hardware is unset.
     _emulator_state["hardware"] = False
     _warn_if_shadowing_stdlib(["time", "gc"])
     err = capsys.readouterr().err
-    assert err == "", f"unexpected warning when --hardware off:\n{err}"
+    assert err == "", f"unexpected output when --hardware off:\n{err}"
 
-    # Warning when --hardware is set, listing the concerning names.
+    # Note when --hardware is set, listing the shadowed names only.
     _emulator_state["hardware"] = True
     _warn_if_shadowing_stdlib(["time", "gc", "picographics"])
     err = capsys.readouterr().err
-    assert "WARNING" in err
+    assert "shadowing stdlib" in err
     assert "'time'" in err
     assert "'gc'" in err
     # Non-stdlib mock names shouldn't be listed.
     assert "picographics" not in err
 
 
-def test_install_mocks_emits_shadow_warning_under_hardware(capsys):
-    """The real install_mocks() must trigger the warning when --hardware is set."""
+def test_install_mocks_emits_shadow_note_under_hardware(capsys):
+    """install_mocks() must trigger the shadow note when --hardware is set."""
     from emulator.mocks import install_mocks
 
     _emulator_state["hardware"] = True
     install_mocks(device_name="inky_impression")
 
     err = capsys.readouterr().err
-    assert "WARNING" in err, f"expected shadow warning, got stderr:\n{err}"
+    assert "shadowing stdlib" in err, f"expected shadow note, got stderr:\n{err}"
     assert "time" in err
     assert "gc" in err
+
+
+# ──────────────────────── --hardware-test ────────────────────────────
+
+def _slow_show(*_a, **_kw):
+    """show() impl that blocks long enough to look like a real refresh."""
+    import time as _t
+    _t.sleep(1.05)
+
+
+def test_hardware_self_test_returns_zero_when_show_blocks_realistically(capsys):
+    """Self-test calls set_border/set_image/show directly on _hw_device
+    and returns 0 when show() takes long enough to look like a real
+    panel refresh."""
+    from emulator.hardware.self_test import run_hardware_self_test
+
+    display = _make_display()
+    hw = MagicMock(width=800, height=480, BLACK=0)
+    hw.show.side_effect = _slow_show
+    display._hw_device = hw
+
+    rc = run_hardware_self_test(display, display.device)
+
+    assert rc == 0
+    hw.set_border.assert_called_once_with(0)
+    hw.set_image.assert_called_once()
+    hw.show.assert_called_once()
+    out = capsys.readouterr().out
+    assert "test frame" in out
+    assert "OK" in out
+
+
+def test_hardware_self_test_flags_suspiciously_fast_show(capsys):
+    """If show() returns in <1s, the panel didn't really refresh —
+    self-test must exit non-zero with a clear warning."""
+    from emulator.hardware.self_test import run_hardware_self_test
+
+    display = _make_display()
+    hw = MagicMock(width=800, height=480, BLACK=0)
+    # default MagicMock returns immediately — perfect repro of "panel
+    # didn't actually refresh"
+    display._hw_device = hw
+
+    rc = run_hardware_self_test(display, display.device)
+
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "show() returned in under" in err
+    assert "Bookworm" in err
+
+
+def test_hardware_self_test_fails_if_no_hw_device(capsys):
+    """When _hw_device is missing, the self-test must fail loudly."""
+    from emulator.hardware.self_test import run_hardware_self_test
+
+    display = _make_display()
+    display._hw_device = None
+
+    rc = run_hardware_self_test(display, display.device)
+
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "no _hw_device" in err
+
+
+def test_hardware_self_test_propagates_hardware_exception(capsys):
+    """If a hardware call raises, exit code is 1 and the exception
+    surfaces in the log."""
+    from emulator.hardware.self_test import run_hardware_self_test
+
+    display = _make_display()
+    hw = MagicMock(width=800, height=480, BLACK=0)
+    hw.show.side_effect = RuntimeError("panel offline")
+    display._hw_device = hw
+
+    rc = run_hardware_self_test(display, display.device)
+
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "panel offline" in err

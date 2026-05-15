@@ -15,35 +15,36 @@ _vfs_enabled = False
 _vfs_root = None
 
 
-# Stdlib modules that real CPython libraries (e.g. inky) call into at
-# runtime. When --hardware is on, replacing these with MicroPython mocks
-# can break the real library silently (e.g. a mock time.sleep that
-# no-ops the BUSY-pin polling inside inky.show()).
-_HW_BREAKING_STDLIB = {
+# Stdlib modules our mocks replace in sys.modules. Real CPython
+# libraries (e.g. inky) reach into these at runtime, so it's useful
+# debugging info to know they were shadowed. Our mock time/gc currently
+# delegate to the real stdlib (mock_time.sleep -> _time.sleep), so in
+# practice this is informational, not a smoking gun.
+_SHADOWED_STDLIB = {
     "time", "gc", "threading", "socket", "ssl",
     "asyncio", "signal", "select", "selectors", "errno",
 }
 
 
 def _warn_if_shadowing_stdlib(names):
-    """Emit a single noisy warning per install_mocks() call.
+    """Log shadowed stdlib modules under --hardware (informational).
 
-    Lists every concerning stdlib module our mocks are about to overwrite
-    in sys.modules. Only fires when --hardware is set, since that's the
-    only time replacing stdlib is likely to cause silent breakage.
+    Lists every stdlib module our mocks are about to overwrite in
+    sys.modules. Only fires when --hardware is set — useful context if
+    you ever need to debug real-library-meets-mock interactions, but
+    not a claim that anything is broken.
     """
     from emulator import get_state
     state = get_state()
     if not state.get("hardware"):
         return
-    bad = [n for n in names if n in _HW_BREAKING_STDLIB]
-    if not bad:
+    shadowed = [n for n in names if n in _SHADOWED_STDLIB]
+    if not shadowed:
         return
     print(
-        f"[mocks] WARNING: --hardware is set, but installing mocks for "
-        f"stdlib modules {bad!r}. Real CPython libraries (e.g. inky) that "
-        f"call into these at runtime may misbehave silently. If your panel "
-        f"doesn't refresh, this is the first thing to investigate.",
+        f"[mocks] note: shadowing stdlib {shadowed!r} in sys.modules "
+        f"(--hardware mode). Our mocks delegate to the real stdlib, so "
+        f"this is usually fine — flagged for visibility when debugging.",
         file=sys.stderr,
     )
 
