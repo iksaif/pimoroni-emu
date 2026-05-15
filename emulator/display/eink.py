@@ -513,11 +513,46 @@ class EInkDisplay(BaseDisplay):
         print(f"[Hardware] Using {cls.__module__}.{cls.__name__} "
               f"{self._hw_device.width}x{self._hw_device.height}")
 
+    def _buffer_to_image_for_hardware(self, buffer):
+        """Convert framebuffer to clean PIL Image for the real inky driver.
+
+        Handles both pen indices (e.g. inky_frame.WHITE == 1) via palette
+        lookup AND RGB-packed values from create_pen()/create_pen_hsv().
+        Skips the emulator-specific dithering and paper-tinting applied
+        in EInkDisplay._buffer_to_image — the real inky library handles
+        its own palette quantization at set_image() time.
+        """
+        height = len(buffer)
+        width = len(buffer[0]) if height > 0 else 0
+        img = Image.new("RGB", (width, height))
+        pixels = img.load()
+
+        palette_len = len(self._palette)
+        for y in range(height):
+            for x in range(width):
+                color = buffer[y][x]
+                if color > 255:
+                    # RGB-packed from create_pen / create_pen_hsv
+                    r = (color >> 16) & 0xFF
+                    g = (color >> 8) & 0xFF
+                    b = color & 0xFF
+                elif self._is_color and color < palette_len:
+                    # Pen index → palette lookup (color e-ink)
+                    r, g, b = self._palette[color]
+                else:
+                    # Pen index 0-15 for B&W grayscale e-ink
+                    r = g = b = int(color * 255 / 15) if color <= 15 else color
+                pixels[x, y] = (r, g, b)
+        return img
+
     def _push_to_hardware(self, buffer):
         """Send framebuffer to real e-ink hardware.
 
-        Uses BaseDisplay._buffer_to_image (clean RGB, no dithering/tinting)
-        because the real inky library handles palette quantization itself.
+        Uses _buffer_to_image_for_hardware so pen-index values
+        (e.g. inky_frame.WHITE = 1) are mapped via the palette before
+        being handed to the real inky driver. Using BaseDisplay's
+        RGB-packed converter here would mis-encode `1` as RGB(0,0,1)
+        and produce a near-black panel.
 
         Entry/success traces are gated on --trace so the log stays quiet
         for normal runs. Errors always print (with traceback) since those
@@ -530,9 +565,7 @@ class EInkDisplay(BaseDisplay):
             print(f"[Hardware] _push_to_hardware: entering, buffer={len(buffer)} rows",
                   flush=True)
         try:
-            # Get clean RGB image via the base class (not the EInk override
-            # which applies emulator-specific dithering and paper tinting)
-            image = BaseDisplay._buffer_to_image(self, buffer)
+            image = self._buffer_to_image_for_hardware(buffer)
 
             # Resize if emulated resolution differs from hardware
             hw_w, hw_h = self._hw_device.width, self._hw_device.height
