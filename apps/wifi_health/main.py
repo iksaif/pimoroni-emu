@@ -1,14 +1,14 @@
-"""WiFi Health Monitor — Presto and Tufty 2350.
+"""WiFi Health Monitor — Presto edition.
 
 CRT-themed terminal aesthetic, 3 screens (Current / Log / Settings).
-Adapts automatically to the host device:
-  * Presto    480x480 touchscreen, ring LEDs reflect status, touch tabs
-  * Tufty     320x240 LCD, A/B/C buttons switch screens, UP/DOWN navigate
-              the settings list and A cycles the selected option
+Targets the Presto's 480x480 touchscreen — ring LEDs reflect status,
+touch tabs switch screens.
+
+For Tufty 2350 see apps/wifi_health_tufty/ (separate codebase because
+the Tufty's badgeware API differs significantly from PicoGraphics).
 
 Run from the repo root:
     python -m emulator --device presto apps/wifi_health/main.py
-    python -m emulator --device tufty  apps/wifi_health/main.py
 """
 
 import os as _os

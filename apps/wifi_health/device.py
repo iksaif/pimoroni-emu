@@ -1,13 +1,17 @@
-"""Device abstraction — same app on Presto (touch + LEDs) and Tufty (buttons).
+"""Device abstraction for Presto only.
+
+The Tufty 2350 ships with Pimoroni's badgeware firmware (different API
+surface: image/screen/badge globals, no `picographics` module). Use
+apps/wifi_health_tufty/ for a Tufty-native port — this app stays
+Presto-only.
 
 Exposes a Device object with:
   display              the PicoGraphics instance
   width, height        display bounds
   has_touch            True on Presto
-  buttons              dict of named hardware buttons (Tufty), else {}
-  status_leds(rgb)     paint the Presto ring; no-op on Tufty
-  read_touch()         (x, y, pressed) tuple — only meaningful when has_touch
-  update()             flush display (and touch on Presto)
+  status_leds(rgb)     paint the Presto ring
+  read_touch()         (x, y, pressed) tuple
+  update()             flush display + poll touch
 """
 
 
@@ -16,7 +20,6 @@ class Device:
         self.kind = None
         self._presto = None
         self._display = None
-        self._buttons = {}
         self.has_touch = False
         self.width = 0
         self.height = 0
@@ -29,7 +32,7 @@ class Device:
 
         Accepts an iterable of up to NUM_LEDS (r, g, b) tuples. `scale`
         divides each channel — bumps tones down to a wall-bias level
-        rather than glare. No-op on Tufty (no LEDs).
+        rather than glare.
 
         The upstream Presto module only exposes set_led_rgb (it flushes
         immediately), so we don't try to call set_led_brightness or
@@ -57,14 +60,8 @@ class Device:
         return int(t.x), int(t.y), bool(t.state)
 
     def read_buttons(self):
-        """Return a dict of name -> bool for buttons currently held.
-
-        Names match the hardware silkscreen: A, B, C, UP, DOWN.
-        Presto has none and returns an empty dict.
-        """
-        if not self._buttons:
-            return {}
-        return {name: btn.is_pressed() for name, btn in self._buttons.items()}
+        """Presto has no physical buttons — always empty."""
+        return {}
 
     # ── Frame flush ────────────────────────────────────────────────────
     def update(self):
@@ -103,23 +100,7 @@ def detect():
     except ImportError:
         pass
 
-    # Tufty 2350 (PicoGraphics + 5 buttons)
-    try:
-        from picographics import DISPLAY_TUFTY_2350, PicoGraphics
-        from pimoroni import Button
-        display = PicoGraphics(display=DISPLAY_TUFTY_2350)
-        dev.kind = "tufty"
-        dev._display = display
-        dev.width, dev.height = display.get_bounds()
-        dev._buttons = {
-            "A":    Button(7),
-            "B":    Button(8),
-            "C":    Button(9),
-            "UP":   Button(22),
-            "DOWN": Button(6),
-        }
-        return dev
-    except ImportError:
-        pass
-
-    raise RuntimeError("WiFi Health Monitor needs Presto or Tufty 2350")
+    raise RuntimeError(
+        "WiFi Health Monitor (Presto edition) requires the presto module. "
+        "For Tufty 2350, use the apps/wifi_health_tufty/ variant."
+    )
