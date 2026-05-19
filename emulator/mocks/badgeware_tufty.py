@@ -426,22 +426,42 @@ class image:
     X2 = 1
     X4 = 2
 
-    def __init__(self, width, height, _pg=None):
-        self.width = int(width)
-        self.height = int(height)
+    def __init__(self, width, height, _pg=None, is_screen=False):
+        # Native (panel) dimensions — what the backing PicoGraphics is
+        # actually allocated at. `width`/`height` below report the
+        # mode-dependent logical dimensions for `screen`, so apps see
+        # 160x120 in LORES and 320x240 in HIRES (matching real Tufty
+        # firmware where `display.fullres(False)` halves screen.WIDTH).
+        self._native_w = int(width)
+        self._native_h = int(height)
+        self._is_screen = bool(is_screen)
         # Use a real PicoGraphics for `screen` (so update() pushes to
         # the emulator display). Off-screen images get their own.
         self._pg = _pg if _pg is not None else PicoGraphics(
-            display=DISPLAY_TUFTY_2350, width=self.width, height=self.height
+            display=DISPLAY_TUFTY_2350, width=self._native_w, height=self._native_h
         )
         self._pen = color.rgb(255, 255, 255)
         self._font = _PixelFont("sins")
         self.antialias = image.OFF
         self.alpha = 255
-        self.clip = rect(0, 0, self.width, self.height)
+        self.clip = rect(0, 0, self._native_w, self._native_h)
         # Apply default pen + font on the PG side
         self._sync_pen()
         self._sync_font()
+
+    @property
+    def width(self):
+        # In LORES, the framebuffer surface apps draw to is half the
+        # panel size. _Display.update() scales it 2x on the way out.
+        if self._is_screen and (badge._mode & HIRES) == 0:
+            return self._native_w // 2
+        return self._native_w
+
+    @property
+    def height(self):
+        if self._is_screen and (badge._mode & HIRES) == 0:
+            return self._native_h // 2
+        return self._native_h
 
     # Sentinel for "transparent" pixel in our RGB buffer. PicoGraphics
     # uses a 24-bit RGB int per pixel, so we steal an unused bit pattern
@@ -736,8 +756,33 @@ class _Display:
         return self._screen.height if self._screen else 240
 
     def update(self):
-        if self._screen is not None:
-            self._screen._pg.update()
+        if self._screen is None:
+            return
+        pg = self._screen._pg
+        # LORES: apps drew into the upper-left logical_w x logical_h
+        # region; real Tufty hardware scales 2x to fill the panel via
+        # `display.fullres(False)`. Replicate by nearest-neighbour
+        # 2x upscaling that region into the full framebuffer before
+        # we push to the emulator's display renderer.
+        if self._screen._is_screen and (badge._mode & HIRES) == 0:
+            lw = pg.WIDTH // 2
+            lh = pg.HEIGHT // 2
+            buf = pg._buffer
+            # Snapshot the source region so writes to the panel half
+            # don't corrupt unread cells in the upper-left quadrant.
+            src = [row[:lw] for row in buf[:lh]]
+            for sy in range(lh):
+                top = buf[sy * 2]
+                bot = buf[sy * 2 + 1]
+                row = src[sy]
+                for sx in range(lw):
+                    v = row[sx]
+                    dx = sx * 2
+                    top[dx] = v
+                    top[dx + 1] = v
+                    bot[dx] = v
+                    bot[dx + 1] = v
+        pg.update()
 
     def set_backlight(self, value):
         pass
@@ -1090,7 +1135,7 @@ def install_badgeware():
     dev = get_state().get("device")
     width = getattr(dev, "display_width", 320) if dev else 320
     height = getattr(dev, "display_height", 240) if dev else 240
-    screen_image = image(width, height)
+    screen_image = image(width, height, is_screen=True)
     display.bind(screen_image)
 
     builtins.screen = screen_image
