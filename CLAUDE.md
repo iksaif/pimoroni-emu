@@ -32,6 +32,56 @@ python -m emulator --list-devices
 - `apps/` - Demo/test applications
 - `tests/` - Pytest test suites
 
+## Two graphics stacks: PicoGraphics vs badgeware
+
+The Pimoroni device family splits into two distinct graphics APIs and the
+emulator supports both, transparently for the same `--device` flag:
+
+- **PicoGraphics** (`from picographics import PicoGraphics`): used by
+  Tufty 2040, Presto, Inky Frame, and pre-badgeware Blinky apps.
+  `display.set_pen(p)`, `display.text(s, x, y, scale=N)`,
+  `display.measure_text(s)` → int. Lives in `emulator/mocks/picographics.py`.
+- **Badgeware** (globals `screen`, `display`, `badge`, `color`, `shape`,
+  `image`, `vec2`, `rect`, `mat3`, `rom_font`, `pixel_font`, `BUTTON_*`):
+  used by the **2350-family** badges — Tufty 2350, Badger 2350, Blinky 2350.
+  `screen.pen = p`, `screen.text(s, x, y)`, `screen.measure_text(s)` →
+  `(w, h)`. Lives in `emulator/mocks/badgeware_tufty.py` (despite the name,
+  it's device-agnostic — reads dimensions from `state["device"]`).
+
+When `--device tufty` (or `badger`/`blinky`) is passed, the emulator
+installs **both** picographics and badgeware mocks so legacy `apps/tufty/`
+examples keep working alongside upstream-style `vendor/<board>/firmware/apps/`.
+
+### /system/ filesystem mapping
+
+Badgeware apps boot with `os.chdir("/system/apps/<name>")` and read assets
+from `/system/assets/`, `/rom/fonts/`. The emulator translates these in
+`emulator/mocks/__init__.py:_translate_path` to the active device's
+vendor tree:
+
+| Real-device path     | Resolves to (Tufty)                         |
+|----------------------|---------------------------------------------|
+| `/system/apps/foo`   | `vendor/tufty2350/firmware/apps/foo` then `apps/foo` |
+| `/system/assets/`    | `vendor/tufty2350/firmware/assets/`         |
+| `/rom/fonts/`        | `vendor/tufty2350/romfs/fonts/`             |
+
+For `--device badger` and `--device blinky` the vendor root is
+`vendor/badger2350/` and `vendor/blinky2350/` respectively. `os.chdir`,
+`os.listdir`, `os.path.exists` etc. are monkey-patched to be VFS-aware.
+
+### Smoke-testing both stacks
+
+`scripts/smoke.sh` runs every app under the active device's vendor tree
+through the emulator and reports pass/fail. Always re-run after touching
+`badgeware_tufty.py` or `__init__.py`:
+
+```bash
+scripts/smoke.sh                   # default: --device tufty
+scripts/smoke.sh --device badger   # all upstream Badger apps
+scripts/smoke.sh --device blinky   # all upstream Blinky apps
+scripts/smoke.sh --autosave        # also save frame_00003.png per app
+```
+
 ## Keeping mocks in sync with upstream
 
 The `vendor/` directory contains git submodules of the real Pimoroni firmware repos. Our mocks in `emulator/mocks/` must stay compatible with these upstream APIs.
@@ -46,9 +96,12 @@ The `vendor/` directory contains git submodules of the real Pimoroni firmware re
 2. **Check for API changes** in the upstream MicroPython modules. Key source files:
    - PicoGraphics: `vendor/pimoroni-pico/micropython/modules/picographics/`
    - Presto: `vendor/presto/modules/`
-   - Badger: `vendor/badger2040/badger_os/`
-   - Blinky/Badgeware: `vendor/blinky2350/modules/`
+   - Badger 2040 (legacy): `vendor/badger2040/badger_os/`
+   - Badgeware (Tufty 2350): `vendor/tufty2350/modules/common/badgeware/`
+   - Badgeware (Badger 2350): `vendor/badger2350/modules/common/badgeware/`
+   - Badgeware (Blinky 2350): `vendor/blinky2350/modules/`
    - Inky (Python): `vendor/inky/inky/`
+   - Canonical badgeware API docs: `https://badgewa.re/docs` (use `curl -A "Mozilla/5.0"` to bypass WebFetch's 403)
 
 3. **Diff the APIs** against our mocks:
    ```bash
