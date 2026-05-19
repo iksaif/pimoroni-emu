@@ -208,3 +208,22 @@ def ease_in_out_bounce(x):
     if x < 0.5:
         return (1 - ease_out_bounce(1 - 2 * x)) / 2
     return (1 + ease_out_bounce(2 * x - 1)) / 2
+
+
+# ── camelCase aliases ─────────────────────────────────────────────────
+# Upstream Pimoroni apps mix snake_case and camelCase (e.g. easing.py
+# tutorials use snake_case but vendor/blinky2350/firmware/apps/menu/ uses
+# easeInOutCirc). Generate aliases programmatically so any name resolves.
+_aliases = {}
+for _name in list(globals()):
+    if _name.startswith("ease_in_out_"):
+        _camel = "easeInOut" + "".join(p.capitalize() for p in _name[len("ease_in_out_"):].split("_"))
+        _aliases[_camel] = globals()[_name]
+    elif _name.startswith("ease_in_"):
+        _camel = "easeIn" + "".join(p.capitalize() for p in _name[len("ease_in_"):].split("_"))
+        _aliases[_camel] = globals()[_name]
+    elif _name.startswith("ease_out_"):
+        _camel = "easeOut" + "".join(p.capitalize() for p in _name[len("ease_out_"):].split("_"))
+        _aliases[_camel] = globals()[_name]
+globals().update(_aliases)
+del _aliases, _name

@@ -61,6 +61,54 @@ class _Color:
     def magenta(self):
         return self.rgb(255, 0, 255)
 
+    # Grayscale presets (Badger e-paper uses these heavily)
+    @property
+    def dark_grey(self):
+        return self.rgb(80, 80, 80)
+
+    dark_gray = dark_grey  # spelling variant
+
+    @property
+    def grey(self):
+        return self.rgb(128, 128, 128)
+
+    gray = grey
+
+    @property
+    def light_grey(self):
+        return self.rgb(180, 180, 180)
+
+    light_gray = light_grey
+
+    # Extra named colors used by some upstream apps (per badgewa.re/docs)
+    @property
+    def orange(self):
+        return self.rgb(246, 135, 4)
+
+    @property
+    def lime(self):
+        return self.rgb(9, 183, 117)
+
+    @property
+    def latte(self):
+        return self.rgb(220, 200, 170)
+
+    @property
+    def smoke(self):
+        return self.rgb(180, 180, 180)
+
+    @property
+    def taupe(self):
+        return self.rgb(180, 160, 130)
+
+    @property
+    def brown(self):
+        return self.rgb(120, 75, 30)
+
+    @property
+    def grape(self):
+        return self.rgb(120, 50, 180)
+
 
 color = _Color()
 

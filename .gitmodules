@@ -24,3 +24,8 @@
 [submodule "vendor/tufty2350"]
 	path = vendor/tufty2350
 	url = https://github.com/pimoroni/tufty2350.git
+	ignore = untracked
+[submodule "vendor/badger2350"]
+	path = vendor/badger2350
+	url = https://github.com/pimoroni/badger2350.git
+	ignore = untracked

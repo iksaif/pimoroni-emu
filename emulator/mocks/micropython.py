@@ -8,6 +8,21 @@ def const(value):
     return value
 
 
+def native(fn):
+    """@micropython.native — compile to native code (no-op in CPython)."""
+    return fn
+
+
+def viper(fn):
+    """@micropython.viper — type-specialised native code (no-op in CPython)."""
+    return fn
+
+
+def asm_thumb(fn):
+    """@micropython.asm_thumb — inline assembly (no-op in CPython)."""
+    return fn
+
+
 def opt_level(level: Optional[int] = None) -> int:
     """Get or set optimization level."""
     return 0

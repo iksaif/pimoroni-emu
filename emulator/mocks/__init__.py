@@ -70,6 +70,63 @@ def _translate_path(path: str) -> str:
         except ImportError:
             pass
 
+    # Badgeware /system layout — find first match across the upstream
+    # vendor submodules and the local apps/ tree. The vendor root is
+    # chosen from the active device (Tufty/Badger/Blinky), so e.g.
+    # /system/apps/foo on `--device badger` resolves under
+    # vendor/badger2350/.
+    if path == "/system" or path == "/system/apps" or path == "/rom" \
+            or path.startswith("/system/") or path.startswith("/rom/"):
+        repo_root = Path(__file__).resolve().parents[2]
+        suffix = path.lstrip("/")
+
+        # Pick the vendor root from the device. Order matters: most
+        # devices will only have one vendor tree, but we fall back to
+        # tufty for backwards compatibility.
+        from emulator import get_state as _get_state
+        dev = _get_state().get("device")
+        dev_name = type(dev).__name__.lower() if dev else ""
+        if "badger" in dev_name:
+            vendor_roots = [repo_root / "vendor" / "badger2350"]
+        elif "blinky" in dev_name:
+            vendor_roots = [repo_root / "vendor" / "blinky2350"]
+        elif "tufty" in dev_name:
+            vendor_roots = [repo_root / "vendor" / "tufty2350"]
+        else:
+            # Multi-search when no clear device — useful for inspection.
+            vendor_roots = [
+                repo_root / "vendor" / "tufty2350",
+                repo_root / "vendor" / "badger2350",
+                repo_root / "vendor" / "blinky2350",
+            ]
+
+        candidates = []
+        if suffix == "system/apps":
+            for v in vendor_roots:
+                candidates.append(v / "firmware" / "apps")
+        elif suffix == "system":
+            for v in vendor_roots:
+                candidates.append(v / "firmware")
+        elif suffix == "rom":
+            for v in vendor_roots:
+                candidates.append(v / "romfs")
+        elif suffix.startswith("system/apps/"):
+            sub = suffix[len("system/apps/"):]
+            for v in vendor_roots:
+                candidates.append(v / "firmware" / "apps" / sub)
+            candidates.append(repo_root / "apps" / sub)
+        elif suffix.startswith("system/assets/"):
+            sub = suffix[len("system/assets/"):]
+            for v in vendor_roots:
+                candidates.append(v / "firmware" / "assets" / sub)
+        elif suffix.startswith("rom/fonts/"):
+            sub = suffix[len("rom/fonts/"):]
+            for v in vendor_roots:
+                candidates.append(v / "romfs" / "fonts" / sub)
+        for c in candidates:
+            if c.exists():
+                return str(c)
+
     global _vfs_root
     if not _vfs_enabled or not _vfs_root:
         return path
@@ -172,6 +229,65 @@ def _patch_os_uname():
         os.sync = uos.sync
     if not hasattr(os, "dupterm"):
         os.dupterm = uos.dupterm
+
+    _patch_os_path_translation()
+
+
+_PATH_TRANSLATED = False
+
+
+def _patch_os_path_translation():
+    """Make os.chdir / os.listdir / os.stat / os.path.exists VFS-aware.
+
+    Apps boot with `os.chdir("/system/apps/foo")` etc. — without this,
+    those fall straight through to the host FS and 404. We wrap each
+    function so its first argument is run through `_translate_path`.
+    """
+    global _PATH_TRANSLATED
+    if _PATH_TRANSLATED:
+        return
+    _PATH_TRANSLATED = True
+
+    import os
+
+    def _wrap_first_arg(orig):
+        def wrapper(p, *a, **kw):
+            return orig(_translate_path(p) if isinstance(p, str) else p, *a, **kw)
+        return wrapper
+
+    # Special-cased listdir: /system/apps is a UNION of vendor +
+    # local app dirs, so the underlying single path is insufficient.
+    _orig_listdir = os.listdir
+
+    def _listdir(p=".", *a, **kw):
+        s = str(p) if not isinstance(p, str) else p
+        if s in ("/system/apps", "/system/apps/"):
+            from emulator import get_state as _gs
+            repo_root = Path(__file__).resolve().parents[2]
+            dev = _gs().get("device")
+            dev_name = type(dev).__name__.lower() if dev else ""
+            if "badger" in dev_name:
+                vendor = repo_root / "vendor/badger2350/firmware/apps"
+            elif "blinky" in dev_name:
+                vendor = repo_root / "vendor/blinky2350/firmware/apps"
+            else:
+                vendor = repo_root / "vendor/tufty2350/firmware/apps"
+            entries = set()
+            for d in (vendor, repo_root / "apps"):
+                if d.is_dir():
+                    entries.update(_orig_listdir(str(d)))
+            return sorted(entries)
+        return _orig_listdir(_translate_path(s) if isinstance(p, str) else p, *a, **kw)
+
+    os.listdir = _listdir
+
+    for attr in ("chdir", "stat", "lstat", "scandir"):
+        if hasattr(os, attr):
+            setattr(os, attr, _wrap_first_arg(getattr(os, attr)))
+
+    for attr in ("exists", "isdir", "isfile", "islink"):
+        if hasattr(os.path, attr):
+            setattr(os.path, attr, _wrap_first_arg(getattr(os.path, attr)))
 
     # Patch os.stat/os.listdir/os.remove/os.rename to translate MicroPython paths
     # (e.g. /sd/img/... -> <app_dir>/img/...) through mount points.
@@ -296,8 +412,21 @@ def install_mocks(device_name=None):
     if not _dn or "presto" in _dn:
         sys.modules["presto"] = presto
         sys.modules["touch"] = touch
-    if not _dn or "tufty" in _dn:
-        sys.modules["tufty2350"] = tufty2350
+    if not _dn or "tufty" in _dn or "badger" in _dn:
+        if "tufty" in _dn or not _dn:
+            sys.modules["tufty2350"] = tufty2350
+        # Tufty 2350 / Badger 2350 ship with Pimoroni's badgeware
+        # firmware (not PicoGraphics). Install the badgeware shim and
+        # inject its builtins so apps written against the upstream
+        # vendor/<board>/firmware/apps/ trees run unmodified in the
+        # emulator. The picographics mock is still installed above for
+        # legacy apps in apps/tufty/.
+        from emulator.mocks import _msc, badgeware_tufty, easing, wifi
+        sys.modules["badgeware"] = badgeware_tufty
+        sys.modules["wifi"] = wifi
+        sys.modules["_msc"] = _msc
+        sys.modules["easing"] = easing
+        badgeware_tufty.install_badgeware()
     if not _dn or "inky" in _dn:
         sys.modules["inky_frame"] = inky_frame
     if not _dn or "badger" in _dn:
@@ -459,7 +588,6 @@ def install_badgeware_mocks():
 
     # Blinky-specific modules
     sys.modules["blinky"] = blinky
-    sys.modules["badgeware"] = badgeware
     sys.modules["picovector"] = picovector
     sys.modules["picographics"] = picographics
     sys.modules["ntptime"] = ntptime
@@ -476,12 +604,21 @@ def install_badgeware_mocks():
     # Initialize blinky display
     blinky_display = blinky.Blinky()
 
-    # Create screen and install builtins
-    badgeware._create_screen()
-    badgeware._setup_builtins()
+    # Modern badgeware (post-v2.0.1 `badge` API) — install our
+    # device-agnostic shim so upstream vendor/blinky2350/firmware/apps/
+    # can run unmodified. Legacy `io` is kept as an alias for the older
+    # apps in apps/blinky/.
+    from emulator.mocks import _msc, badgeware_tufty, wifi
+    sys.modules["badgeware"] = badgeware_tufty
+    sys.modules["wifi"] = wifi
+    sys.modules["_msc"] = _msc
+    badgeware_tufty.install_badgeware()
 
-    # Link the badgeware screen buffer to the blinky display buffer
-    badgeware.screen._buffer = blinky_display._buffer
+    import builtins as _b
+    # Blinky exposes input via `io` (property-based: `BUTTON_A in io.pressed`)
+    # rather than `badge` (method-based: `badge.pressed(BUTTON_A)`). The
+    # modern badgeware shim has an `_IO` class for exactly this case.
+    _b.io = badgeware_tufty.io
 
 
 def uninstall_mocks():
