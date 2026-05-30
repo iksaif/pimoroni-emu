@@ -37,6 +37,7 @@ DISPLAY_BADGER_2350 = 24
 DISPLAY_INKY_FRAME_7 = 25
 DISPLAY_INKY_FRAME_4 = 26
 DISPLAY_INKY_FRAME_5 = 27
+DISPLAY_PRESTO_FULL_RES = 28
 DISPLAY_GENERIC = 100  # Generic display with custom width/height
 
 # Pen types (color modes)
@@ -50,7 +51,8 @@ PEN_RGB888 = 5
 # Display dimensions
 _DISPLAY_SIZES = {
     DISPLAY_TUFTY_2350: (320, 240),
-    DISPLAY_PRESTO: (480, 480),
+    DISPLAY_PRESTO: (240, 240),
+    DISPLAY_PRESTO_FULL_RES: (480, 480),
     DISPLAY_BLINKY: (39, 26),  # LED matrix (39 cols x 26 rows)
     DISPLAY_PICO_DISPLAY: (240, 135),
     DISPLAY_BADGER_2350: (296, 128),  # E-ink badge
