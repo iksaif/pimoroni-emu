@@ -197,8 +197,21 @@ class WLAN:
             self._ip, self._subnet, self._gateway, self._dns = config
         return (self._ip, self._subnet, self._gateway, self._dns)
 
-    def config(self, **kwargs):
-        """Configure interface parameters."""
+    def config(self, param=None, **kwargs):
+        """Get or set interface parameters.
+
+        Accepts both the getter form `config("ssid")` and the setter form
+        `config(hostname="foo")` to match MicroPython's WLAN.config() API.
+        """
+        if param is not None:
+            # Getter: config("ssid") / config("mac") / config("hostname")
+            if param == "ssid":
+                return self._ssid
+            if param == "mac":
+                return self._mac
+            if param == "hostname":
+                return self._hostname
+            return None
         for key, value in kwargs.items():
             if key == "hostname":
                 self._hostname = value

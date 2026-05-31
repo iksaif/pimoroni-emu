@@ -12,23 +12,43 @@ work; that's wired through the existing urequests / network mocks
 and doesn't need any wifi setup.
 """
 
+from emulator import get_state
+
+
+def _get_wlan():
+    """Return the singleton WLAN STA interface, creating it if needed."""
+    import network as _net  # noqa: PLC0415 — lazy to avoid circular import at load time
+    return _net.WLAN(_net.STA_IF)
+
 
 def connect(ssid=None, password=None):
-    """Pretend to start connecting. Always succeeds."""
+    """Pretend to start connecting. Marks the WLAN mock as connected."""
+    wlan = _get_wlan()
+    wlan.active(True)
+    wlan._connected = True
+    wlan._ip = "192.168.1.100"
+    wlan._gateway = "192.168.1.1"
+    wlan._dns = "8.8.8.8"
+    if ssid:
+        wlan._ssid = ssid
     return True
 
 
 def tick():
-    """Return True once connected (we report connected immediately)."""
+    """Return True once connected. Ensures the WLAN mock reports connected."""
+    wlan = _get_wlan()
+    if not wlan._connected:
+        connect()
     return True
 
 
 def is_connected():
-    return True
+    return _get_wlan()._connected
 
 
 def disconnect():
-    pass
+    wlan = _get_wlan()
+    wlan._connected = False
 
 
 def status():
@@ -36,4 +56,4 @@ def status():
 
 
 def ip():
-    return "127.0.0.1"
+    return _get_wlan()._ip
