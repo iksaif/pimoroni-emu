@@ -5,7 +5,12 @@ from typing import Tuple
 
 from emulator import get_state
 from emulator.mocks.base import trace_log
-from emulator.mocks.picographics import DISPLAY_PRESTO, PEN_RGB565, PicoGraphics
+from emulator.mocks.picographics import (
+    DISPLAY_PRESTO,
+    DISPLAY_PRESTO_FULL_RES,
+    PEN_RGB565,
+    PicoGraphics,
+)
 from emulator.mocks.touch import FT6236
 
 # LED positions (7 SK6812 LEDs around the edge)
@@ -41,7 +46,7 @@ class Presto:
 
         # Create display
         self.display = PicoGraphics(
-            display=DISPLAY_PRESTO,
+            display=DISPLAY_PRESTO_FULL_RES if full_res else DISPLAY_PRESTO,
             pen_type=PEN_RGB565,
         )
         self.width, self.height = self.display.get_bounds()

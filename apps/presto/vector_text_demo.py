@@ -12,7 +12,7 @@ import time
 from picovector import ANTIALIAS_BEST, PicoVector, Polygon, Transform
 from presto import Presto
 
-presto = Presto()
+presto = Presto(full_res=True)
 display = presto.display
 WIDTH, HEIGHT = display.get_bounds()
 

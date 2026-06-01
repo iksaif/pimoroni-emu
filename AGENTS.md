@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 ## Project overview
 
@@ -59,11 +59,11 @@ from `/system/assets/`, `/rom/fonts/`. The emulator translates these in
 `emulator/mocks/__init__.py:_translate_path` to the active device's
 vendor tree:
 
-| Real-device path     | Resolves to (Tufty)                         |
-|----------------------|---------------------------------------------|
-| `/system/apps/foo`   | `vendor/tufty2350/firmware/apps/foo` then `apps/foo` |
-| `/system/assets/`    | `vendor/tufty2350/firmware/assets/`         |
-| `/rom/fonts/`        | `vendor/tufty2350/romfs/fonts/`             |
+| Real-device path   | Resolves to (Tufty)                                  |
+| ------------------ | ---------------------------------------------------- |
+| `/system/apps/foo` | `vendor/tufty2350/firmware/apps/foo` then `apps/foo` |
+| `/system/assets/`  | `vendor/tufty2350/firmware/assets/`                  |
+| `/rom/fonts/`      | `vendor/tufty2350/romfs/fonts/`                      |
 
 For `--device badger` and `--device blinky` the vendor root is
 `vendor/badger2350/` and `vendor/blinky2350/` respectively. `os.chdir`,
@@ -89,6 +89,7 @@ The `vendor/` directory contains git submodules of the real Pimoroni firmware re
 ### Workflow for syncing mocks
 
 1. **Update submodules** to latest upstream:
+
    ```bash
    git submodule update --remote
    ```
@@ -104,6 +105,7 @@ The `vendor/` directory contains git submodules of the real Pimoroni firmware re
    - Canonical badgeware API docs: `https://badgewa.re/docs` (use `curl -A "Mozilla/5.0"` to bypass WebFetch's 403)
 
 3. **Diff the APIs** against our mocks:
+
    ```bash
    # Example: check what PicoGraphics methods exist upstream
    grep -r "def " vendor/pimoroni-pico/micropython/modules/picographics/ | sort
@@ -151,6 +153,7 @@ done
 ```
 
 When an upstream example fails:
+
 1. Check if it's a missing mock module (add stub to `emulator/mocks/` and register in `__init__.py`)
 2. Check if it's a missing method on an existing mock (add method stub)
 3. Check if it requires real hardware (document as unsupported)

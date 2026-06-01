@@ -5,7 +5,7 @@ import time
 from presto import Presto
 
 # Initialize Presto
-presto = Presto()
+presto = Presto(full_res=True)
 display = presto.display
 WIDTH, HEIGHT = display.get_bounds()
 
