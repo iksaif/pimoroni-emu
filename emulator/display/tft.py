@@ -98,8 +98,12 @@ class TFTDisplay(BaseDisplay):
         height = len(buffer)
         width = len(buffer[0]) if height > 0 else 0
 
-        for y in range(min(height, self.device.display_height)):
-            for x in range(min(width, self.device.display_width)):
+        # Adjust surface size if it doesn't match the buffer size
+        if self._display_surface.get_width() != width or self._display_surface.get_height() != height:
+            self._display_surface = pygame.Surface((width, height))
+
+        for y in range(height):
+            for x in range(width):
                 color = buffer[y][x]
                 r = (color >> 16) & 0xFF
                 g = (color >> 8) & 0xFF

@@ -5,7 +5,7 @@ import time
 from presto import Presto
 
 # Initialize Presto
-presto = Presto()
+presto = Presto(full_res=True)
 display = presto.display
 WIDTH, HEIGHT = display.get_bounds()
 
@@ -57,7 +57,7 @@ def draw_screen():
     display.text("Touch a", 180, 220, scale=2)
     display.text("button!", 180, 250, scale=2)
 
-    display.update()
+    presto.update()
 
 def check_button_press(x, y):
     """Check if touch is within a button."""
@@ -72,15 +72,15 @@ def check_button_press(x, y):
             r = (current_color >> 16) & 0xFF
             g = (current_color >> 8) & 0xFF
             b = current_color & 0xFF
-            presto.set_all_leds_rgb(r, g, b)
-            presto.update_leds()
+            for i in range(presto.NUM_LEDS):
+                presto.set_led_rgb(i, r, g, b)
             return True
 
     return False
 
 # Set initial LED color
-presto.set_all_leds_rgb(255, 255, 255)
-presto.update_leds()
+for i in range(presto.NUM_LEDS):
+    presto.set_led_rgb(i, 255, 255, 255)
 
 # Initial draw
 draw_screen()
