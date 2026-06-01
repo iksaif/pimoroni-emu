@@ -6,6 +6,7 @@ from emulator import _emulator_state
 from emulator.devices.presto import PrestoDevice
 from emulator.hardware.touch import TouchManager
 from emulator.mocks.presto import Presto
+from emulator.mocks.picographics import DISPLAY_PRESTO, DISPLAY_PRESTO_FULL_RES
 
 
 @pytest.fixture(autouse=True)
@@ -27,6 +28,12 @@ def test_presto_touch_scaling_half_res():
 
     # Presto mock (full_res=False, which is default)
     presto = Presto(full_res=False)
+
+    # Verify display bounds in half resolution mode
+    # (Fails in old code which returns 480x480)
+    width, height = presto.display.get_bounds()
+    assert width == 240
+    assert height == 240
 
     # Find window center coordinates
     disp_rect = device.get_display_rect()
@@ -55,7 +62,13 @@ def test_presto_touch_scaling_full_res():
     touch_manager = TouchManager(device)
 
     # Presto mock (full_res=True)
+    # (Fails in old code due to lack of DISPLAY_PRESTO_FULL_RES support)
     presto = Presto(full_res=True)
+
+    # Verify display bounds in full resolution mode
+    width, height = presto.display.get_bounds()
+    assert width == 480
+    assert height == 480
 
     # Find window center coordinates
     disp_rect = device.get_display_rect()
