@@ -12,7 +12,6 @@ work; that's wired through the existing urequests / network mocks
 and doesn't need any wifi setup.
 """
 
-from emulator import get_state
 
 
 def _get_wlan():

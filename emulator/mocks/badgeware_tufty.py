@@ -211,6 +211,7 @@ class _ROMFonts:
     def __dir__(self):
         # Enumerate from the active device's romfs (vendor/<board>/romfs/fonts/).
         import os
+
         from emulator.mocks import _translate_path
         try:
             local = _translate_path("/rom/fonts")
@@ -1033,6 +1034,7 @@ def launch(path):
     """
     import os
     import sys
+
     from emulator.mocks import _translate_path
 
     local_dir = _translate_path(path)

@@ -20,7 +20,8 @@ def disable():
 # — which is `import x.y` syntax requiring `_msc` to be a package. We
 # fake packagehood by setting __path__, then expose a `py` submodule via
 # sys.modules so the import resolves.
-import sys as _sys
-__path__ = []  # noqa: PYL — declares this module as a namespace package
+import sys as _sys  # noqa: E402
+
+__path__ = []  # noqa: E305 — declares this module as a namespace package
 py = _sys.modules[__name__]  # `_msc.py` resolves to ourselves
 _sys.modules.setdefault("_msc.py", _sys.modules[__name__])

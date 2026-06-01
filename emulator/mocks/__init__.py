@@ -544,7 +544,6 @@ def install_badgeware_mocks():
     Also includes picographics for low-level examples that use both APIs.
     """
     from emulator.mocks import (
-        badgeware,
         blinky,
         breakout_bme280,
         easing,
@@ -602,7 +601,7 @@ def install_badgeware_mocks():
     init_battery()
 
     # Initialize blinky display
-    blinky_display = blinky.Blinky()
+    blinky.Blinky()
 
     # Modern badgeware (post-v2.0.1 `badge` API) — install our
     # device-agnostic shim so upstream vendor/blinky2350/firmware/apps/

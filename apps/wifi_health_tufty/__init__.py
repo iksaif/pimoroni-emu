@@ -15,10 +15,10 @@ with the AP listed in secrets.py (WIFI_SSID / WIFI_PASSWORD), then
 times TCP connects to the gateway and a public host as a ping proxy.
 """
 
-import sys
 import os
-import time
 import socket
+import sys
+import time
 
 APP_DIR = "/system/apps/wifi_health_tufty"
 try:
@@ -27,8 +27,9 @@ try:
 except (OSError, NameError):
     pass
 
-import network
 import secrets
+
+import network
 import wifi  # noqa: F401 — badgeware's helper, drives the WLAN connect
 
 # Avoid importing urequests at module top (heavy frozen module); we
