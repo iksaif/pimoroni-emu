@@ -38,7 +38,6 @@ class Presto:
 
         # LED strip data
         self._leds = [(0, 0, 0)] * NUM_LEDS
-        self._led_brightness = 1.0
 
         # Create display
         self.display = PicoGraphics(
@@ -115,38 +114,14 @@ class Presto:
         r, g, b = colorsys.hsv_to_rgb(h, s, v)
         self.set_led_rgb(index, int(r * 255), int(g * 255), int(b * 255))
 
-    def set_all_leds_rgb(self, r: int, g: int, b: int):
-        """Set all LEDs to same color."""
-        for i in range(NUM_LEDS):
-            self._leds[i] = (r, g, b)
-
-    def set_all_leds_hsv(self, h: float, s: float, v: float):
-        """Set all LEDs to same HSV color."""
-        import colorsys
-        r, g, b = colorsys.hsv_to_rgb(h, s, v)
-        self.set_all_leds_rgb(int(r * 255), int(g * 255), int(b * 255))
-
-    def set_led_brightness(self, brightness: float):
-        """Set LED brightness (0.0 to 1.0)."""
-        self._led_brightness = max(0.0, min(1.0, brightness))
-
-    def update_leds(self):
-        """Update LED strip."""
-        trace_log("Presto", f"Update LEDs: {self._leds}")
-
     def get_leds(self) -> list:
         """Get current LED colors (for emulator rendering)."""
-        factor = self._led_brightness
-        return [
-            (int(r * factor), int(g * factor), int(b * factor))
-            for r, g, b in self._leds
-        ]
+        return self._leds
 
     # Update
     def update(self):
-        """Update display and LEDs."""
+        """Update display."""
         self.display.update()
-        self.update_leds()
         self.touch.poll()
 
     def partial_update(self, x: int, y: int, w: int, h: int):
