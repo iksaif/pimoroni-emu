@@ -373,8 +373,94 @@ class EInkDisplay(BaseDisplay):
                 led_on = led and led.is_on if led else False
                 led_color = (255, 255, 200) if led_on else (60, 60, 55)
                 pygame.draw.circle(self._window, led_color, (btn_x - 8, btn_y), 4)
+        elif getattr(self.device, 'badger_button_layout', False):
+            # Badger 2350 layout:
+            #   A / B / C  — below the display, evenly spaced
+            #   UP / DOWN  — right of the display, stacked
+            #   USR / RST  — small, bottom-right corner (back buttons)
+            disp_x, disp_y, disp_w, disp_h = self.device.get_display_rect()
+
+            bottom_names = ("A", "B", "C")
+            right_names  = ("UP", "DOWN")
+            back_names   = ("USR",)
+
+            bottom_btns = [b for b in self.device.buttons if b.name in bottom_names]
+            right_btns  = [b for b in self.device.buttons if b.name in right_names]
+            back_btns   = [b for b in self.device.buttons if b.name in back_names]
+
+            font_sm = safe_font(pygame, "monospace", 10)
+
+            # ── A / B / C along the bottom ──────────────────────────
+            btn_h_y = disp_y + disp_h + 20
+            if bottom_btns:
+                slot = disp_w // len(bottom_btns)
+                for i, bc in enumerate(bottom_btns):
+                    btn   = buttons.get(bc.pin)
+                    pressed = btn._pressed if btn else False
+                    cx = disp_x + slot * i + slot // 2
+                    col = (80, 150, 80) if pressed else (90, 90, 95)
+                    pygame.draw.rect(self._window, col,
+                                     (cx - 22, btn_h_y - 12, 44, 24), border_radius=4)
+                    if font:
+                        lbl = font.render(bc.name, True, (255, 255, 255))
+                        self._window.blit(lbl, lbl.get_rect(center=(cx, btn_h_y)))
+                    if font_sm:
+                        hint = font_sm.render(f"[{bc.key}]", True, (140, 140, 140))
+                        self._window.blit(hint, hint.get_rect(center=(cx, btn_h_y + 18)))
+
+            # ── UP / DOWN on the right ───────────────────────────────
+            right_cx = disp_x + disp_w + 37
+            if right_btns:
+                slot = disp_h // len(right_btns)
+                for i, bc in enumerate(right_btns):
+                    btn   = buttons.get(bc.pin)
+                    pressed = btn._pressed if btn else False
+                    cy = disp_y + slot * i + slot // 2
+                    col = (80, 150, 80) if pressed else (90, 90, 95)
+                    pygame.draw.rect(self._window, col,
+                                     (right_cx - 22, cy - 14, 44, 28), border_radius=4)
+                    # Draw a triangle arrow (the bitmap font fallback can't
+                    # render the ▲/▼ unicode glyphs, so use a real polygon).
+                    ay = cy - 3
+                    if bc.name == "UP":
+                        pts = [(right_cx, ay - 5), (right_cx - 6, ay + 4),
+                               (right_cx + 6, ay + 4)]
+                    else:
+                        pts = [(right_cx, ay + 5), (right_cx - 6, ay - 4),
+                               (right_cx + 6, ay - 4)]
+                    pygame.draw.polygon(self._window, (255, 255, 255), pts)
+                    if font_sm:
+                        hint = font_sm.render(bc.key.upper(), True, (180, 180, 180))
+                        self._window.blit(hint, hint.get_rect(center=(right_cx, cy + 10)))
+
+            # ── USR (back button) — small, bottom-right ──────────────
+            back_x = right_cx
+            back_y = btn_h_y
+            for bc in back_btns:
+                btn   = buttons.get(bc.pin)
+                pressed = btn._pressed if btn else False
+                col = (160, 100, 50) if pressed else (75, 75, 80)
+                pygame.draw.rect(self._window, col,
+                                 (back_x - 20, back_y - 10, 40, 20), border_radius=3)
+                if font_sm:
+                    lbl = font_sm.render(bc.name, True, (220, 220, 220))
+                    self._window.blit(lbl, lbl.get_rect(center=(back_x, back_y - 2)))
+                    hint = font_sm.render(f"[{bc.key.upper()}]", True, (140, 140, 140))
+                    self._window.blit(hint, hint.get_rect(center=(back_x, back_y + 10)))
+
+            # ── RST — small, above USR ───────────────────────────────
+            rst_y = back_y - 30
+            rst_col = (140, 60, 60)
+            pygame.draw.rect(self._window, rst_col,
+                             (back_x - 20, rst_y - 10, 40, 20), border_radius=3)
+            if font_sm:
+                lbl = font_sm.render("RST", True, (255, 200, 200))
+                self._window.blit(lbl, lbl.get_rect(center=(back_x, rst_y - 2)))
+                hint = font_sm.render("[R]", True, (140, 140, 140))
+                self._window.blit(hint, hint.get_rect(center=(back_x, rst_y + 10)))
+
         else:
-            # Badger / generic layout: buttons horizontally at the bottom
+            # Generic layout: all buttons horizontally at the bottom
             win_h = self.device.get_window_size()[1]
             x = 10
             for btn_config in self.device.buttons:
@@ -455,8 +541,49 @@ class EInkDisplay(BaseDisplay):
                 btn_y = int(disp_top + spacing * (i + 1))
                 if btn_x <= x < btn_x + 24 and btn_y - 10 <= y < btn_y + 10:
                     return btn_config.key
+        elif getattr(self.device, 'badger_button_layout', False):
+            disp_x, disp_y, disp_w, disp_h = self.device.get_display_rect()
+
+            bottom_names = ("A", "B", "C")
+            right_names  = ("UP", "DOWN")
+            back_names   = ("USR",)
+
+            bottom_btns = [b for b in self.device.buttons if b.name in bottom_names]
+            right_btns  = [b for b in self.device.buttons if b.name in right_names]
+            back_btns   = [b for b in self.device.buttons if b.name in back_names]
+
+            # A / B / C
+            btn_h_y = disp_y + disp_h + 20
+            if bottom_btns:
+                slot = disp_w // len(bottom_btns)
+                for i, bc in enumerate(bottom_btns):
+                    cx = disp_x + slot * i + slot // 2
+                    if cx - 22 <= x < cx + 22 and btn_h_y - 12 <= y < btn_h_y + 12:
+                        return bc.key
+
+            # UP / DOWN
+            right_cx = disp_x + disp_w + 37
+            if right_btns:
+                slot = disp_h // len(right_btns)
+                for i, bc in enumerate(right_btns):
+                    cy = disp_y + slot * i + slot // 2
+                    if right_cx - 22 <= x < right_cx + 22 and cy - 14 <= y < cy + 14:
+                        return bc.key
+
+            # USR
+            back_x = right_cx
+            back_y = btn_h_y
+            for bc in back_btns:
+                if back_x - 20 <= x < back_x + 20 and back_y - 10 <= y < back_y + 10:
+                    return bc.key
+
+            # RST
+            rst_y = back_y - 30
+            if back_x - 20 <= x < back_x + 20 and rst_y - 10 <= y < rst_y + 10:
+                return "r"
+
         else:
-            # Badger: horizontal buttons at the bottom
+            # Generic layout: all buttons horizontally at the bottom
             win_h = self.device.get_window_size()[1]
             bx = 10
             for btn_config in self.device.buttons:

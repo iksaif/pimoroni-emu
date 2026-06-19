@@ -16,10 +16,74 @@ ASCII_RAMP = " .:-=+*#%@"
 _font_cache: dict = {}
 
 
-def safe_font(pg, name: str = "monospace", size: int = 14, bold: bool = False):
-    """Get a pygame font, falling back gracefully on broken font modules (Python 3.14+).
+class _BitmapPygameFont:
+    """Minimal pygame ``Font`` stand-in backed by the built-in ``bitmap8``
+    glyphs.
 
-    Returns None if no font backend is available.
+    Used when the real ``pygame.font`` backend is unavailable — e.g. on
+    Python 3.14 the pygame 2.6 / SDL_ttf binding fails to import, so
+    ``pygame.font`` is a ``MissingModule`` and every emulator-chrome label
+    (button names, key hints, status text) would silently render as
+    nothing. This keeps those labels visible by rasterising the same
+    bitmap font the PicoGraphics mock uses, onto a pygame surface.
+
+    Implements just the slice of the Font API the renderers use:
+    ``render(text, antialias, color)`` → Surface and ``size(text)``.
+    """
+
+    def __init__(self, pg, size: int):
+        from emulator.mocks.fonts import get_font
+        self._pg = pg
+        self._font = get_font("bitmap8")  # 8px tall, columns LSB=top
+        # Scale the 8px glyphs to roughly match the requested point size.
+        self._scale = max(1, round(size / 8))
+        self._spacing = 1
+        self._cache: dict = {}
+
+    def render(self, text, antialias=True, color=(255, 255, 255), background=None):
+        text = str(text)
+        rgb = tuple(color[:3])
+        key = (text, rgb, self._scale)
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        f = self._font
+        sc = self._scale
+        sp = self._spacing
+        w = max(1, f.measure_text(text, sp) * sc)
+        h = f.height * sc
+        surf = self._pg.Surface((w, h), self._pg.SRCALPHA)
+        surf.fill((0, 0, 0, 0))
+
+        cx = 0
+        for ch in text:
+            columns, char_w = f.get_char_data(ch)
+            for ci in range(char_w):
+                if ci >= len(columns):
+                    break
+                col_byte = columns[ci]
+                for row in range(f.height):
+                    if col_byte & (1 << row):  # LSB = top row
+                        surf.fill(rgb, ((cx + ci) * sc, row * sc, sc, sc))
+            cx += char_w + sp
+
+        self._cache[key] = surf
+        return surf
+
+    def size(self, text):
+        text = str(text)
+        return (self._font.measure_text(text, self._spacing) * self._scale,
+                self._font.height * self._scale)
+
+
+def safe_font(pg, name: str = "monospace", size: int = 14, bold: bool = False):
+    """Get a font for drawing emulator chrome (labels, status text).
+
+    Prefers a real pygame font. If the pygame font backend is unavailable
+    (notably the broken pygame/SDL_ttf binding on Python 3.14), falls back
+    to a bitmap-glyph stand-in so labels still render rather than silently
+    disappearing. Always returns a usable font object.
     """
     key = (name, size, bold)
     cached = _font_cache.get(key)
@@ -37,6 +101,14 @@ def safe_font(pg, name: str = "monospace", size: int = 14, bold: bool = False):
                 font = pg.font.Font(None, size)
             except (NotImplementedError, ImportError, AttributeError):
                 pass
+
+    if font is None:
+        # No real font backend — use the bitmap fallback so chrome labels
+        # (e.g. the button names) remain legible.
+        try:
+            font = _BitmapPygameFont(pg, size)
+        except Exception:  # noqa: BLE001 — last resort, never block rendering
+            font = None
 
     _font_cache[key] = font
     return font
