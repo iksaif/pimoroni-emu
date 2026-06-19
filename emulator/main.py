@@ -360,10 +360,20 @@ def main():
         install_mocks(device_name=_dev_name)
         print("  Library: picographics (MicroPython)")
 
-    # Set up virtual filesystem for badger apps
-    if app_path is not None and "badger" in str(app_path).lower():
-        setup_vfs(str(app_path))
-        print("  VFS: enabled (badger_os filesystem)")
+    # Set up virtual filesystem for badger/tufty/blinky badgeware apps.
+    # Trigger on the device name (not just the app path) so that running
+    # `main.py` or any app in a project that targets a badger device still
+    # gets the /system/apps/* → host-filesystem VFS translation.
+    if app_path is not None:
+        _needs_vfs = (
+            "badger" in device_name.lower()
+            or "tufty" in device_name.lower()
+            or "blinky" in device_name.lower()
+            or "badger" in str(app_path).lower()
+        )
+        if _needs_vfs:
+            setup_vfs(str(app_path))
+            print("  VFS: enabled (badger_os filesystem)")
 
     # Create display
     display = create_display(device, headless=args.headless)
@@ -592,8 +602,7 @@ def run_app_interactive(
                         state["running"] = False
                         break
                     elif key_name == "r":
-                        # Reset - would need to restart app
-                        print("Reset not implemented yet")
+                        state["reset_requested"] = True
                     else:
                         button_manager.handle_key_down(key_name)
                         _handle_qwstpad_key(state, key_name, pressed=True)

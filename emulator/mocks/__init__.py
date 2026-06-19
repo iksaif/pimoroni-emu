@@ -13,6 +13,7 @@ from pathlib import Path
 _original_open = builtins.open
 _vfs_enabled = False
 _vfs_root = None
+_user_apps_root = None  # User's project apps/ dir, discovered by setup_vfs
 
 
 # Stdlib modules our mocks replace in sys.modules. Real CPython
@@ -112,11 +113,24 @@ def _translate_path(path: str) -> str:
                 candidates.append(v / "romfs")
         elif suffix.startswith("system/apps/"):
             sub = suffix[len("system/apps/"):]
+            # The user's own project app (and its assets) must take
+            # precedence: when running a user app, `os.chdir(/system/apps/
+            # <name>)` and relative loads like image.load("avatar.png")
+            # should resolve against the user's copy, NOT a same-named
+            # vendor app (whose assets may differ in size and throw off
+            # layout maths). Vendor firmware apps are only a fallback for
+            # apps the user hasn't created themselves.
+            if _user_apps_root:
+                candidates.append(Path(_user_apps_root) / sub)
+            candidates.append(repo_root / "apps" / sub)
             for v in vendor_roots:
                 candidates.append(v / "firmware" / "apps" / sub)
-            candidates.append(repo_root / "apps" / sub)
         elif suffix.startswith("system/assets/"):
             sub = suffix[len("system/assets/"):]
+            # Prefer the user's project assets over the vendor's, same as
+            # for apps above.
+            if _user_apps_root:
+                candidates.append(Path(_user_apps_root).parent / "assets" / sub)
             for v in vendor_roots:
                 candidates.append(v / "firmware" / "assets" / sub)
         elif suffix.startswith("rom/fonts/"):
@@ -181,6 +195,21 @@ def setup_vfs(app_path: str, vfs_root: str = "/tmp/badger_vfs"):
                 if dst.exists():
                     shutil.rmtree(dst)
                 shutil.copytree(src, dst)
+
+    # Discover the user's project apps/ root so that /system/apps/<name>
+    # can resolve to the user's own app directories (e.g. a Badger project
+    # with apps/ next to main.py).  Walk up from the app file until we
+    # find a directory that contains an apps/ subdirectory.
+    global _user_apps_root
+    _resolved_app = Path(app_path).resolve()
+    _search = _resolved_app.parent
+    for _ in range(6):
+        if (_search / "apps").is_dir():
+            _user_apps_root = str(_search / "apps")
+            break
+        if _search.parent == _search:
+            break
+        _search = _search.parent
 
     # Enable VFS and patch open
     _vfs_enabled = True
@@ -393,6 +422,8 @@ def install_mocks(device_name=None):
     # MicroPython stdlib aliases
     import json as _json
     sys.modules["ujson"] = _json
+    from emulator.mocks import binascii as mock_binascii
+    sys.modules["binascii"] = mock_binascii
 
     # Patch os.uname() to report as MicroPython on RP2
     _patch_os_uname()
@@ -581,6 +612,8 @@ def install_badgeware_mocks():
     # MicroPython stdlib aliases
     import json as _json
     sys.modules["ujson"] = _json
+    from emulator.mocks import binascii as mock_binascii
+    sys.modules["binascii"] = mock_binascii
 
     # Patch os.uname() to report as MicroPython on RP2
     _patch_os_uname()
