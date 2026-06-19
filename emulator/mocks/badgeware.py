@@ -150,6 +150,15 @@ class vec2:
     def __mul__(self, scalar):
         return vec2(self.x * scalar, self.y * scalar)
 
+    def __truediv__(self, scalar):
+        return vec2(self.x / scalar, self.y / scalar)
+
+    def __rmul__(self, scalar):
+        return vec2(self.x * scalar, self.y * scalar)
+
+    def __neg__(self):
+        return vec2(-self.x, -self.y)
+
     def __repr__(self):
         return f"vec2({self.x}, {self.y})"
 
