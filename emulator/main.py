@@ -278,6 +278,9 @@ def main():
         if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
             args.headless = True
 
+    if not args.headless:
+        print("  Screenshot: click the camera button (top-right) or press F12")
+        print("  Sleep: click the moon button (top-right) or press F2; any input wakes")
     if args.headless:
         print("  Mode: Headless")
     if args.scale != 1:
@@ -520,6 +523,43 @@ def run_app_headless(app_path: Path, max_frames: int = 0):
     thread.join(timeout=1.0)
 
 
+def _save_screenshot(display):
+    """Capture a clean screenshot of the current app frame and report it."""
+    if not hasattr(display, "save_screenshot"):
+        return
+    path = display.save_screenshot()
+    if path:
+        print(f"[emulator] Screenshot saved: {path}")
+        # Redraw so the button click registers visually right away.
+        if hasattr(display, "refresh_ui"):
+            display.refresh_ui()
+    else:
+        print("[emulator] Screenshot: nothing rendered yet")
+
+
+def _set_sleep(display, sleeping: bool):
+    """Put the emulated device to sleep or wake it, updating the UI."""
+    state = get_state()
+    if bool(state.get("sleeping")) == sleeping:
+        return
+    if sleeping:
+        state["sleeping"] = True
+        state["device_status"] = "Sleeping"
+        print("[emulator] Device asleep — press any button to wake")
+    else:
+        state["sleeping"] = False
+        state.pop("device_status", None)
+        print("[emulator] Device woken")
+    # Force a redraw so the overlay/button state updates immediately.
+    if hasattr(display, "refresh_ui"):
+        display.refresh_ui()
+
+
+def _toggle_sleep(display):
+    """Toggle the device between asleep and awake."""
+    _set_sleep(display, not get_state().get("sleeping"))
+
+
 def _handle_qwstpad_key(state: dict, key_name: str, pressed: bool):
     """Update QwSTPad button bitmask from keyboard input."""
     from emulator.mocks.qwstpad import KEY_TO_BUTTON
@@ -596,6 +636,19 @@ def run_app_interactive(
                 break
 
             elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_F12:
+                    _save_screenshot(display)
+                    continue
+                # While asleep, any key wakes the device (except quitting).
+                if state.get("sleeping"):
+                    if event.key in (pygame.K_q, pygame.K_ESCAPE):
+                        state["running"] = False
+                        break
+                    _set_sleep(display, False)
+                    continue
+                if event.key == pygame.K_F2:
+                    _toggle_sleep(display)
+                    continue
                 key_name = button_manager.pygame_key_to_name(event.key)
                 if key_name:
                     if key_name in ("q", "escape"):
@@ -615,6 +668,19 @@ def run_app_interactive(
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click
+                    # Check if clicking a chrome button (screenshot / sleep)
+                    chrome = (display.get_chrome_button_at(*event.pos)
+                              if hasattr(display, 'get_chrome_button_at') else None)
+                    if chrome == "screenshot":
+                        _save_screenshot(display)
+                        continue
+                    if chrome == "sleep":
+                        _toggle_sleep(display)
+                        continue
+                    # While asleep, any other click wakes the device.
+                    if state.get("sleeping"):
+                        _set_sleep(display, False)
+                        continue
                     # Check if clicking a button indicator
                     btn_key = None
                     if hasattr(display, 'get_button_at'):

@@ -296,6 +296,12 @@ class EInkDisplay(BaseDisplay):
         # Draw buttons
         self._draw_buttons()
 
+        # Draw screenshot + sleep buttons (top-right corner)
+        self._draw_chrome_buttons(pygame, self._window)
+
+        # Sleep overlay (dim + banner) when the device is asleep
+        self._draw_sleep_overlay(pygame, self._window)
+
         # Update display
         pygame.display.flip()
 
@@ -322,7 +328,11 @@ class EInkDisplay(BaseDisplay):
         else:
             text = font.render(f"Frame: {self._frame_count}", True, (100, 100, 100))
         win_w = self.device.get_window_size()[0]
-        self._window.blit(text, (win_w - text.get_width() - 10, 10))
+        # Keep the status text clear of the chrome buttons (top-right corner).
+        right_limit = self._chrome_buttons_left_edge()
+        if right_limit is None:
+            right_limit = win_w - 10
+        self._window.blit(text, (right_limit - text.get_width() - 8, 10))
 
         # Memory bar
         mem = self._get_memory_info()

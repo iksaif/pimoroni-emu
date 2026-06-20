@@ -1300,8 +1300,11 @@ class run:
         dev = get_state().get("device")
         _is_eink = getattr(dev, 'is_eink', False)
 
+        from emulator.mocks.base import honor_sleep
         try:
             while st.get("running", True):
+                # Halt the app loop while the device is asleep (UI sleep button).
+                honor_sleep()
                 max_frames = st.get("max_frames", 0)
                 if max_frames > 0 and st.get("frame_count", 0) >= max_frames:
                     break
@@ -1398,11 +1401,20 @@ def wait_for_button_or_alarm(timeout=30_000):
     registry for any change and leave edge computation to the run loop.
     """
     import time as _t
+
+    from emulator.mocks.base import honor_sleep
     timeout_s = min(timeout / 1000.0, 30.0)
     deadline = _t.time() + timeout_s
     entry_held = _raw_held_buttons()
     while get_state().get("running", True):
         st = get_state()
+        if st.get("sleeping"):
+            # Device asleep: halt the idle wait, then resume cleanly once
+            # woken (re-baseline held buttons and restart the timeout).
+            honor_sleep()
+            entry_held = _raw_held_buttons()
+            deadline = _t.time() + timeout_s
+            continue
         if st.pop("reset_requested", False):
             from emulator.mocks.machine import _MachineResetError
             raise _MachineResetError()
