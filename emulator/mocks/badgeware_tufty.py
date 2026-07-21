@@ -32,7 +32,6 @@ rnd = _legacy.rnd
 frnd = _legacy.frnd
 State = _legacy.State
 scroll_text = _legacy.scroll_text
-load_font = _legacy.load_font
 
 
 def set_brightness(value):
@@ -133,7 +132,12 @@ BUTTON_UP = "BUTTON_UP"
 BUTTON_DOWN = "BUTTON_DOWN"
 BUTTON_HOME = "BUTTON_HOME"
 
-_PIN_TO_BUTTON = {7: BUTTON_A, 8: BUTTON_B, 9: BUTTON_C, 22: BUTTON_UP, 6: BUTTON_DOWN}
+_PIN_TO_BUTTON = {
+    # Tufty 2350 button pins
+    7: BUTTON_A, 8: BUTTON_B, 9: BUTTON_C, 22: BUTTON_UP, 6: BUTTON_DOWN,
+    # Badger 2350 button pins
+    12: BUTTON_A, 13: BUTTON_B, 14: BUTTON_C, 15: BUTTON_UP, 11: BUTTON_DOWN,
+}
 
 
 # ── mat3 ─────────────────────────────────────────────────────────────
@@ -166,25 +170,157 @@ class mat3:
 
 
 # ── Fonts ────────────────────────────────────────────────────────────
-class _PixelFont:
-    """Pixel font handle. The emulator routes rendering through the
-    PicoGraphics mock's bitmap fonts, so the handle just remembers a
-    name we map back to a PG font."""
+# The upstream firmware renders Pimoroni `.ppf` pixel fonts at their true
+# on-device sizes (e.g. sins=12px, nope=13px, smart=16px, ignore=28px).
+# We parse and rasterise those files directly so text in the emulator is
+# the right size and width — rather than collapsing every font onto a
+# couple of fixed-size PicoGraphics bitmap fonts.
 
-    # Map upstream font names → PG bitmap font names. Most upstream
-    # pixel fonts have no PG equivalent; we approximate with bitmap8.
-    _PG_FONT_FOR = {
-        "sins": "bitmap6",
-        "ark": "bitmap8",
-        "smart": "bitmap14_outline",
-    }
+import struct as _struct
 
-    def __init__(self, name="sins", height=8):
-        self.name = name
+from emulator.mocks.fonts import _UNICODE_TO_ASCII
+
+# Cache of parsed .ppf fonts keyed by resolved host path (None = miss).
+_PPF_CACHE: dict = {}
+
+
+class _PPFFont:
+    """A parsed Pimoroni pixel font (.ppf).
+
+    Binary layout (big-endian), per vendor pixel_font.cpp:
+        'ppf!' | u16 flags | u32 glyph_count | u16 width | u16 height |
+        char[32] name | glyph_count×(u32 codepoint, u16 width) |
+        glyph_count × (1bpp bitmap, MSB-first, bytes_per_row from the
+        font's max `width`, `height` rows).
+    Advance is `glyph.width + 1`; a space advances by `width // 3`.
+    """
+
+    def __init__(self, width, height, index, widths, data, gds, bpr):
+        self.width = width        # font max glyph width (sets bytes/row)
         self.height = height
+        self._index = index       # codepoint -> glyph slot
+        self._widths = widths     # per-slot advance width
+        self._data = data         # concatenated glyph bitmaps
+        self._gds = gds           # bytes per glyph
+        self._bpr = bpr           # bytes per row
+
+    @staticmethod
+    def try_load(local_path):
+        try:
+            with open(local_path, "rb") as f:
+                blob = f.read()
+        except OSError:
+            return None
+        if len(blob) < 46 or blob[:4] != b"ppf!":
+            return None
+        (count,) = _struct.unpack_from(">I", blob, 6)
+        (gw,) = _struct.unpack_from(">H", blob, 10)
+        (gh,) = _struct.unpack_from(">H", blob, 12)
+        bpr = (gw + 7) >> 3
+        gds = bpr * gh
+        index = {}
+        widths = [0] * count
+        off = 46
+        try:
+            for i in range(count):
+                cp, = _struct.unpack_from(">I", blob, off)
+                w, = _struct.unpack_from(">H", blob, off + 4)
+                index[cp] = i
+                widths[i] = w
+                off += 6
+        except _struct.error:
+            return None
+        data = blob[off:off + gds * count]
+        if len(data) < gds * count:
+            return None
+        return _PPFFont(gw, gh, index, widths, data, gds, bpr)
+
+    def _slot(self, cp):
+        gi = self._index.get(cp)
+        if gi is None:
+            sub = _UNICODE_TO_ASCII.get(cp)
+            if sub:
+                gi = self._index.get(ord(sub))
+        return gi
+
+    def measure(self, text):
+        space = max(1, self.width // 3)
+        w = 0
+        for ch in text:
+            cp = ord(ch)
+            if cp == 32:
+                w += space
+                continue
+            gi = self._slot(cp)
+            if gi is not None:
+                w += self._widths[gi] + 1
+        return (w, self.height)
+
+    def render(self, set_pixel, x, y, text):
+        """Stamp glyphs via `set_pixel(px, py)` (e.g. PicoGraphics.pixel,
+        so the current pen and clip rect apply automatically)."""
+        bpr = self._bpr
+        h = self.height
+        gds = self._gds
+        data = self._data
+        space = max(1, self.width // 3)
+        cx = x
+        for ch in text:
+            cp = ord(ch)
+            if cp == 32:
+                cx += space
+                continue
+            gi = self._slot(cp)
+            if gi is None:
+                cx += space
+                continue
+            gw = self._widths[gi]
+            base = gds * gi
+            for row in range(h):
+                ro = base + row * bpr
+                py = y + row
+                for bit in range(gw):
+                    if data[ro + (bit >> 3)] & (0x80 >> (bit & 0x7)):
+                        set_pixel(cx + bit, py)
+            cx += gw + 1
+        return cx - x
+
+
+class _PixelFont:
+    """Handle for a pixel font. Resolves a `.ppf` by name
+    (`rom_font.<name>` → /rom/fonts/<name>.ppf) or explicit path, parses
+    it lazily, and caches the result. Falls back to a PicoGraphics bitmap
+    font only when the `.ppf` can't be found."""
+
+    def __init__(self, name="sins", path=None):
+        self.name = name
+        self._path = path
+        self._resolved = False
+        self._ppf = None
+
+    def _ppf_font(self):
+        if self._resolved:
+            return self._ppf
+        self._resolved = True
+        from emulator.mocks import _translate_path
+        raw = self._path if self._path else f"/rom/fonts/{self.name}.ppf"
+        local = _translate_path(raw)
+        if local in _PPF_CACHE:
+            self._ppf = _PPF_CACHE[local]
+        else:
+            self._ppf = _PPFFont.try_load(local)
+            _PPF_CACHE[local] = self._ppf
+        return self._ppf
+
+    @property
+    def height(self):
+        ppf = self._ppf_font()
+        return ppf.height if ppf else 8
 
     def _pg_name(self):
-        return self._PG_FONT_FOR.get(self.name, "bitmap8")
+        # Fallback PG bitmap font, used only if the real .ppf is missing.
+        ppf = self._ppf_font()
+        return "bitmap6" if (ppf and ppf.height <= 6) else "bitmap8"
 
 
 class _PixelFontLoader:
@@ -193,10 +329,15 @@ class _PixelFontLoader:
     def load(self, path):
         # Derive a font name from the filename stem (e.g. /rom/fonts/sins.ppf → sins)
         name = path.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-        return _PixelFont(name)
+        return _PixelFont(name, path=path)
 
 
 pixel_font = _PixelFontLoader()
+
+
+def load_font(path):
+    """Load a pixel font from a path (badgeware `load_font` builtin)."""
+    return pixel_font.load(path)
 
 
 class _ROMFonts:
@@ -312,6 +453,12 @@ class _ShapeFactory:
     def regular_polygon(x, y, sides, radius):
         return _Shape("regular_polygon", (x, y, sides, radius))
 
+    @staticmethod
+    def custom(points):
+        """Arbitrary polygon from a list of vec2 (or (x,y)) points."""
+        flat = [(p.x, p.y) if hasattr(p, 'x') else (p[0], p[1]) for p in points]
+        return _Shape("custom", (flat,))
+
 
 shape = _ShapeFactory()
 
@@ -410,11 +557,70 @@ def _shape_points(shape_obj):
                 cy + r * math.sin(2 * math.pi * i / sides - math.pi / 2))
                for i in range(sides)]
 
+    elif k == "custom":
+        pts = list(args[0])
+
     # Apply transform
     if shape_obj._transform is not None:
         pts = [shape_obj._transform.apply(px, py) for px, py in pts]
 
     return pts, closed
+
+
+# ── Pattern brushes ──────────────────────────────────────────────────
+# The 38 embedded 8x8 dither patterns from vendor picovector
+# brushes/pattern.cpp. brush.pattern(c1, c2, index) fills each pixel with
+# c1 where the pattern bit is set (else c2), tiled on absolute (x, y):
+#   bit = patterns[index][y & 7] ; c1 if bit & (1 << (7 - (x & 7))) else c2
+# Without this every brush.pattern() pen collapsed to solid white, losing
+# the badge/menu greyscale backgrounds.
+_PATTERNS = [
+    (0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00),
+    (0x22, 0x00, 0x88, 0x00, 0x22, 0x00, 0x88, 0x00),
+    (0x22, 0x88, 0x22, 0x88, 0x22, 0x88, 0x22, 0x88),
+    (0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA),
+    (0xAA, 0x00, 0xAA, 0x00, 0xAA, 0x00, 0xAA, 0x00),
+    (0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55),
+    (0x11, 0x22, 0x44, 0x88, 0x11, 0x22, 0x44, 0x88),
+    (0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77),
+    (0x4E, 0xCF, 0xFC, 0xE4, 0x27, 0x3F, 0xF3, 0x72),
+    (0x7F, 0xEF, 0xFD, 0xDF, 0xFE, 0xF7, 0xBF, 0xFB),
+    (0x00, 0x77, 0x77, 0x77, 0x00, 0x77, 0x77, 0x77),
+    (0x00, 0x7F, 0x7F, 0x7F, 0x00, 0xF7, 0xF7, 0xF7),
+    (0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF),
+    (0x7F, 0xBF, 0xDF, 0xFF, 0xFD, 0xFB, 0xF7, 0xFF),
+    (0x7D, 0xBB, 0xC6, 0xBB, 0x7D, 0xFE, 0xFE, 0xFE),
+    (0x07, 0x8B, 0xDD, 0xB8, 0x70, 0xE8, 0xDD, 0x8E),
+    (0xAA, 0x5F, 0xBF, 0xBF, 0xAA, 0xF5, 0xFB, 0xFB),
+    (0xDF, 0xAF, 0x77, 0x77, 0x77, 0x77, 0xFA, 0xFD),
+    (0x40, 0xFF, 0x40, 0x40, 0x4F, 0x4F, 0x4F, 0x4F),
+    (0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF),
+    (0x7F, 0xFF, 0xF7, 0xFF, 0x7F, 0xFF, 0xF7, 0xFF),
+    (0x77, 0xFF, 0xDD, 0xFF, 0x77, 0xFF, 0xDD, 0xFF),
+    (0x77, 0xDD, 0x77, 0xDD, 0x77, 0xDD, 0x77, 0xDD),
+    (0x55, 0xFF, 0x55, 0xFF, 0x55, 0xFF, 0x55, 0xFF),
+    (0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF),
+    (0xEE, 0xDD, 0xBB, 0x77, 0xEE, 0xDD, 0xBB, 0x77),
+    (0x00, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF),
+    (0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F),
+    (0x55, 0xFF, 0x7F, 0xFF, 0x77, 0xFF, 0x7F, 0xFF),
+    (0x00, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F),
+    (0xF7, 0xE3, 0xDD, 0x3E, 0x7F, 0xFE, 0xFD, 0xFB),
+    (0x77, 0xEB, 0xDD, 0xBE, 0x77, 0xFF, 0x55, 0xFF),
+    (0xBF, 0x5F, 0xFF, 0xFF, 0xFB, 0xF5, 0xFF, 0xFF),
+    (0xFC, 0x7B, 0xB7, 0xCF, 0xF3, 0xFD, 0xFE, 0xFE),
+    (0x7F, 0x7F, 0xBE, 0xC1, 0xF7, 0xF7, 0xEB, 0x1C),
+    (0xEF, 0xDF, 0xAB, 0x55, 0x00, 0xFD, 0xFB, 0xF7),
+    (0x88, 0x76, 0x70, 0x70, 0x88, 0x67, 0x07, 0x07),
+    (0xFF, 0xF7, 0xEB, 0xD5, 0xAA, 0xD5, 0xEB, 0xF7),
+]
+
+
+def _color_to_rgb24(c):
+    """Convert a badgeware RGBA-packed color int → PicoGraphics 24-bit RGB."""
+    if not isinstance(c, int):
+        return 0xFFFFFF
+    return (((c >> 24) & 0xFF) << 16) | (((c >> 16) & 0xFF) << 8) | ((c >> 8) & 0xFF)
 
 
 # ── image ────────────────────────────────────────────────────────────
@@ -452,15 +658,14 @@ class image:
 
     @property
     def width(self):
-        # In LORES, the framebuffer surface apps draw to is half the
-        # panel size. _Display.update() scales it 2x on the way out.
-        if self._is_screen and (badge._mode & HIRES) == 0:
+        # E-ink devices ignore LORES — FAST_UPDATE/NON_BLOCKING don't halve resolution.
+        if self._is_screen and (badge._mode & HIRES) == 0 and not getattr(self, '_force_hires', False):
             return self._native_w // 2
         return self._native_w
 
     @property
     def height(self):
-        if self._is_screen and (badge._mode & HIRES) == 0:
+        if self._is_screen and (badge._mode & HIRES) == 0 and not getattr(self, '_force_hires', False):
             return self._native_h // 2
         return self._native_h
 
@@ -509,11 +714,38 @@ class image:
 
     def _sync_pen(self):
         # color values produced by _Color.rgb() are packed (r<<24)|(g<<16)|(b<<8)|a
-        c = self._pen if isinstance(self._pen, int) else 0xFFFFFFFF
+        p = self._pen
+        if isinstance(p, tuple):
+            # Brush: solid/gradient/pattern. Set a representative solid
+            # colour for any primitive that doesn't special-case the
+            # brush (gradient → start, pattern → fg). Pattern fills route
+            # through _brush_at() for true per-pixel dithering.
+            c = p[1] if (len(p) > 1 and isinstance(p[1], int)) else 0xFFFFFFFF
+        elif isinstance(p, int):
+            c = p
+        else:
+            c = 0xFFFFFFFF
         r = (c >> 24) & 0xFF
         g = (c >> 16) & 0xFF
         b = (c >> 8) & 0xFF
         self._pg.set_pen(self._pg.create_pen(r, g, b))
+
+    def _brush_at(self):
+        """If the current pen is a pattern brush, return a fn(x, y) →
+        packed RGB24 that selects the dither colour per pixel. Otherwise
+        None — callers use the fast solid PicoGraphics pen."""
+        p = self._pen
+        if isinstance(p, tuple) and p and p[0] == "pattern" and len(p) == 4:
+            _, fg, bg, idx = p
+            pat = _PATTERNS[int(idx) % len(_PATTERNS)]
+            fg24 = _color_to_rgb24(fg)
+            bg24 = _color_to_rgb24(bg)
+
+            def fn(x, y, pat=pat, fg24=fg24, bg24=bg24):
+                return fg24 if (pat[y & 7] & (0x80 >> (x & 7))) else bg24
+
+            return fn
+        return None
 
     # Font
     @property
@@ -537,8 +769,16 @@ class image:
         At alpha=255 (fully opaque) this is a fast overwrite; below
         255 we alpha-blend over the existing framebuffer so effects
         like the launcher menu's fade-in render correctly. alpha=0
-        is a no-op.
+        is a no-op. A pattern brush fills with its dithered colours.
         """
+        fn = self._brush_at()
+        if fn is not None:
+            buf = self._pg._buffer
+            for y in range(self._native_h):
+                row = buf[y]
+                for x in range(self._native_w):
+                    row[x] = fn(x, y)
+            return
         a = self._pen & 0xFF if isinstance(self._pen, int) else 255
         if a >= 255:
             self._pg.clear()
@@ -588,7 +828,16 @@ class image:
             x, y, w, h = r.x, r.y, r.w, r.h
         else:
             x, y, w, h = args
-        self._pg.rectangle(int(x), int(y), int(w), int(h))
+        x, y, w, h = int(x), int(y), int(w), int(h)
+        fn = self._brush_at()
+        if fn is not None:
+            buf = self._pg._buffer
+            for yy in range(max(0, y), min(self._native_h, y + h)):
+                row = buf[yy]
+                for xx in range(max(0, x), min(self._native_w, x + w)):
+                    row[xx] = fn(xx, yy)
+            return
+        self._pg.rectangle(x, y, w, h)
 
     def circle(self, *args):
         if len(args) == 2:
@@ -620,11 +869,36 @@ class image:
             x, y = args[0].x, args[0].y
         else:
             x, y = args[0], args[1]
-        self._pg.text(str(message), int(x), int(y))
+        x, y = int(x), int(y)
+        f = self._font
+        if isinstance(f, _PixelFont):
+            ppf = f._ppf_font()
+            if ppf:
+                brush_fn = self._brush_at()
+                if brush_fn is None:
+                    # Render through pg.pixel so the current pen + clip
+                    # apply, exactly like the other drawing primitives.
+                    ppf.render(self._pg.pixel, x, y, str(message))
+                else:
+                    buf = self._pg._buffer
+                    W, H = self._native_w, self._native_h
+
+                    def _sp(px, py, buf=buf, W=W, H=H, fn=brush_fn):
+                        if 0 <= px < W and 0 <= py < H:
+                            buf[py][px] = fn(px, py)
+
+                    ppf.render(_sp, x, y, str(message))
+                return
+        self._pg.text(str(message), x, y)
 
     def measure_text(self, message, size=None):
+        f = self._font
+        if isinstance(f, _PixelFont):
+            ppf = f._ppf_font()
+            if ppf:
+                return ppf.measure(str(message))
         w = self._pg.measure_text(str(message))
-        h = self._font.height if isinstance(self._font, _PixelFont) else 8
+        h = f.height if isinstance(f, _PixelFont) else 8
         return (int(w), int(h))
 
     def shape(self, shape_obj):
@@ -649,6 +923,8 @@ class image:
         """Scanline-fill a polygon onto the underlying PG buffer."""
         if len(pts) < 3:
             return
+        brush_fn = self._brush_at()
+        buf = self._pg._buffer
         int_pts = [(p[0], p[1]) for p in pts]
         min_y = max(0, int(min(p[1] for p in int_pts)))
         max_y = min(self.height - 1, int(max(p[1] for p in int_pts)))
@@ -666,8 +942,13 @@ class image:
             for i in range(0, len(xs) - 1, 2):
                 xa = max(0, int(xs[i]))
                 xb = min(self.width - 1, int(xs[i + 1]))
-                for x in range(xa, xb + 1):
-                    self._pg.pixel(x, y)
+                if brush_fn is not None:
+                    row = buf[y]
+                    for x in range(xa, xb + 1):
+                        row[x] = brush_fn(x, y)
+                else:
+                    for x in range(xa, xb + 1):
+                        self._pg.pixel(x, y)
 
     def blit(self, src, *args, **kwargs):
         """Blit another image onto this one.
@@ -765,7 +1046,14 @@ class _Display:
         # `display.fullres(False)`. Replicate by nearest-neighbour
         # 2x upscaling that region into the full framebuffer before
         # we push to the emulator's display renderer.
-        if self._screen._is_screen and (badge._mode & HIRES) == 0:
+        #
+        # E-ink panels (Badger) have no half-res mode — they always run
+        # native. Honour `_force_hires` exactly like image.width/height
+        # do, otherwise an app that sets FAST_UPDATE|NON_BLOCKING (which
+        # clears the HIRES bit) would get its top-left quadrant blown up
+        # 2x to fill the panel, i.e. doubled and cut off.
+        if (self._screen._is_screen and (badge._mode & HIRES) == 0
+                and not getattr(self._screen, '_force_hires', False)):
             lw = pg.WIDTH // 2
             lh = pg.HEIGHT // 2
             buf = pg._buffer
@@ -872,6 +1160,10 @@ class _Badge:
     def update(self):
         display.update()
         self.poll()
+        # Match vendor badge.update(): the first full refresh is done, so
+        # apps gating on `badge.first_update` (e.g. the launcher's
+        # `if changed or badge.first_update`) stop refreshing every frame.
+        self.first_update = False
 
     def mode(self, mode_value=None):
         if mode_value is None:
@@ -901,6 +1193,10 @@ class _Badge:
 
     def pressed_to_wake(self, button):
         pass
+
+    def sleep(self, ms=None):
+        """Deep sleep — in the emulator, block until a button is pressed (or timeout)."""
+        wait_for_button_or_alarm(timeout=ms if ms is not None else 30_000)
 
     def caselights(self, *args):
         """Set/get the four rear lighting zones (CL0..CL3).
@@ -998,8 +1294,17 @@ class run:
         auto_clear = auto_clear if auto_clear is not None else self._auto_clear
         if init:
             init()
+        # E-ink devices manage their own refresh timing (badge.update() is
+        # explicit and slow ~500ms). Auto-flushing every frame would double
+        # every refresh and cause constant e-ink animation flicker.
+        dev = get_state().get("device")
+        _is_eink = getattr(dev, 'is_eink', False)
+
+        from emulator.mocks.base import honor_sleep
         try:
             while st.get("running", True):
+                # Halt the app loop while the device is asleep (UI sleep button).
+                honor_sleep()
                 max_frames = st.get("max_frames", 0)
                 if max_frames > 0 and st.get("frame_count", 0) >= max_frames:
                     break
@@ -1013,7 +1318,8 @@ class run:
                 if result is not None:
                     self.result = result
                     return self
-                display.update()
+                if not _is_eink:
+                    display.update()
                 _time.sleep(0.016)
         except KeyboardInterrupt:
             pass
@@ -1069,14 +1375,62 @@ def clear_running():
     pass
 
 
-def wait_for_button_or_alarm(timeout=30_000):
-    """Upstream blocks until any button is pressed or the RTC alarm fires.
+def _raw_held_buttons():
+    """Snapshot the set of currently-held buttons straight from the shared
+    button registry, without touching badge's edge state."""
+    held = set()
+    for pin, btn in get_state().get("buttons", {}).items():
+        if pin in _PIN_TO_BUTTON and getattr(btn, "_pressed", False):
+            held.add(_PIN_TO_BUTTON[pin])
+    return held
 
-    In the emulator we just return immediately so apps that gate updates
-    on user input still progress; the emulator's max-frames cap stops
-    smoke tests from spinning forever.
+
+def wait_for_button_or_alarm(timeout=30_000):
+    """Block until a button state changes, the RTC alarm fires, or timeout.
+
+    On real hardware this halts the CPU. In the emulator we sleep in
+    short intervals so the pygame event loop (running in the main thread)
+    can process input and the app thread wakes up when a button is pressed
+    or the timeout expires.
+
+    Crucially we must NOT call badge.poll() here. poll() diffs held vs
+    prev_held to compute the pressed/released *edges*; if we polled to
+    detect the wake, that same call would consume the edge and the
+    run-loop's poll() at the top of the next frame would see nothing,
+    so update() never observes the press. Instead we watch the raw button
+    registry for any change and leave edge computation to the run loop.
     """
-    badge.poll()
+    import time as _t
+
+    from emulator.mocks.base import honor_sleep
+
+    # Headless mode has no pygame event loop, so no button press or sleep
+    # toggle can ever arrive — blocking here would just stall every frame
+    # for the full timeout. Return immediately, as before, so headless
+    # runs (and scripts/smoke.sh) still progress at real speed.
+    if get_state().get("headless"):
+        return
+
+    timeout_s = min(timeout / 1000.0, 30.0)
+    deadline = _t.time() + timeout_s
+    entry_held = _raw_held_buttons()
+    while get_state().get("running", True):
+        st = get_state()
+        if st.get("sleeping"):
+            # Device asleep: halt the idle wait, then resume cleanly once
+            # woken (re-baseline held buttons and restart the timeout).
+            honor_sleep()
+            entry_held = _raw_held_buttons()
+            deadline = _t.time() + timeout_s
+            continue
+        if st.pop("reset_requested", False):
+            from emulator.mocks.machine import _MachineResetError
+            raise _MachineResetError()
+        if _raw_held_buttons() != entry_held:
+            break
+        if _t.time() >= deadline:
+            break
+        _t.sleep(0.02)
 
 
 class _RTC:
@@ -1090,6 +1444,9 @@ class _RTC:
             return None
         import time as _t
         t = _t.localtime()
+        # localtime() may return a struct_time or a plain tuple (MicroPython mock)
+        if isinstance(t, tuple):
+            return t[:7]
         return (t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec, t.tm_wday)
 
     def alarm_status(self):
@@ -1139,6 +1496,18 @@ def install_badgeware():
     height = getattr(dev, "display_height", 240) if dev else 240
     screen_image = image(width, height, is_screen=True)
     display.bind(screen_image)
+
+    # E-ink devices (Badger) have no LORES half-res mode — they always
+    # run at native resolution. Start in HIRES so screen.width/height
+    # report the real panel dimensions rather than halved values.
+    dev_name = type(dev).__name__.lower() if dev else ""
+    _is_eink = getattr(dev, "is_eink", False) or "badger" in dev_name
+    if _is_eink:
+        badge._mode = HIRES | VSYNC
+    # Stamp the flag on the screen object so width/height always return
+    # native dimensions for e-ink, even if the app calls badge.mode(...)
+    # with flags that don't include HIRES (e.g. FAST_UPDATE|NON_BLOCKING).
+    screen_image._force_hires = _is_eink
 
     builtins.screen = screen_image
     builtins.display = display
@@ -1232,6 +1601,10 @@ def install_badgeware():
     _secrets.WIFI_SSID = getattr(_secrets, "WIFI_SSID", "emulator")
     _secrets.WIFI_PASSWORD = getattr(_secrets, "WIFI_PASSWORD", "emulator")
     _secrets.WIFI_COUNTRY = getattr(_secrets, "WIFI_COUNTRY", "US")
+    # Default location (London) so weather/location apps get a valid API response
+    # instead of "emulator" which Open-Meteo rejects with a parse error.
+    _secrets.LAT = getattr(_secrets, "LAT", 51.5074)
+    _secrets.LON = getattr(_secrets, "LON", -0.1278)
 
     def _require(*keys):
         # Lenient in the emulator: any key the user hasn't set gets a

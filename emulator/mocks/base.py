@@ -14,6 +14,26 @@ def trace_log(component: str, message: str):
         print(f"[{component}] {message}")
 
 
+def honor_sleep():
+    """Block the calling (app) thread while the emulated device is asleep.
+
+    Mimics the device timing out / entering deep sleep: the app halts and
+    its last frame is retained on screen until the user wakes the device
+    (via the UI sleep button, the F2 key, or any input). The emulator's
+    main thread keeps redrawing the "Sleeping" overlay during this time.
+
+    Called from the app thread's natural yield points (frame pushes and
+    idle waits). Returns immediately when the device is awake, so the
+    per-call overhead is a single dict lookup.
+    """
+    state = get_state()
+    if not state.get("sleeping"):
+        return
+    import time as _time
+    while state.get("sleeping") and state.get("running", True):
+        _time.sleep(0.05)
+
+
 class MockDevice:
     """Base class for mock devices with tracing support."""
 

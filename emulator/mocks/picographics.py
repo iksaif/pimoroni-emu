@@ -371,6 +371,12 @@ class PicoGraphics:
         """Push framebuffer to display."""
         state = get_state()
 
+        # If the device has been put to sleep via the UI, halt here so the
+        # last frame stays on screen until the user wakes it. This is the
+        # common frame-push chokepoint for both badgeware and legacy apps.
+        from emulator.mocks.base import honor_sleep
+        honor_sleep()
+
         if state.get("trace"):
             print(f"[PicoGraphics] update() called, frame {state.get('frame_count', 0)}")
 

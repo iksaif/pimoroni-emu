@@ -111,6 +111,7 @@ class ButtonManager:
             pygame.K_ESCAPE: "escape",
             pygame.K_r: "r",
             pygame.K_q: "q",
+            pygame.K_u: "u",
             pygame.K_z: "z",
             pygame.K_x: "x",
             pygame.K_v: "v",

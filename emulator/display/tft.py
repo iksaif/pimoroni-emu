@@ -171,6 +171,12 @@ class TFTDisplay(BaseDisplay):
             if self._sensor_panel.has_sensors():
                 self._sensor_panel.render(self._window)
 
+        # Draw screenshot + sleep buttons (top-right corner)
+        self._draw_chrome_buttons(pygame, self._window)
+
+        # Sleep overlay (dim + banner) when the device is asleep
+        self._draw_sleep_overlay(pygame, self._window)
+
         # Update display
         pygame.display.flip()
 
