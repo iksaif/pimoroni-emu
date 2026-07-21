@@ -1403,6 +1403,14 @@ def wait_for_button_or_alarm(timeout=30_000):
     import time as _t
 
     from emulator.mocks.base import honor_sleep
+
+    # Headless mode has no pygame event loop, so no button press or sleep
+    # toggle can ever arrive — blocking here would just stall every frame
+    # for the full timeout. Return immediately, as before, so headless
+    # runs (and scripts/smoke.sh) still progress at real speed.
+    if get_state().get("headless"):
+        return
+
     timeout_s = min(timeout / 1000.0, 30.0)
     deadline = _t.time() + timeout_s
     entry_held = _raw_held_buttons()

@@ -58,7 +58,11 @@ for app in "${apps[@]}"; do
         autosave_args="--autosave $OUT/$app"
     fi
     output=$(timeout 8 python -m emulator --device "$DEVICE" --headless --max-frames 3 $autosave_args "$app_path" 2>&1)
-    if echo "$output" | grep -q "Reached max frames"; then
+    # E-ink apps in FAST_UPDATE|NON_BLOCKING mode legitimately stop
+    # refreshing once nothing has changed (matches real hardware) — with
+    # no button input in headless mode they never reach max_frames, so an
+    # idle timeout after at least one rendered frame is a pass, not a hang.
+    if echo "$output" | grep -qE "Reached max frames|Idle timeout after [1-9][0-9]* frames"; then
         printf "  OK   %-22s" "$app"
         pass=$((pass+1))
         if [ -n "$SAVE" ] && [ -f "$OUT/$app/frame_00003.png" ]; then
